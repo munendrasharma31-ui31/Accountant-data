@@ -133,11 +133,11 @@ table.dataTable tbody tr:hover{background:rgba(184,134,42,.08)}
 .section-card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:16px}
 
 .toast-container{position:fixed;top:80px;right:24px;z-index:2000}
-.toast{background:var(--panel);color:var(--ink);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:8px;min-width:260px;box-shadow:0 6px 20px -8px rgba(0,0,0,.25);display:flex;gap:10px;animation:tin .25s ease}
-.toast.ok{border-left:4px solid var(--ok)}
-.toast.err{border-left:4px solid var(--bad)}
-.toast.warn{border-left:4px solid var(--warn)}
-.toast.info{border-left:4px solid var(--info)}
+.app-toast{background:var(--panel);color:var(--ink);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:8px;min-width:260px;box-shadow:0 6px 20px -8px rgba(0,0,0,.25);display:flex;gap:10px;animation:tin .25s ease}
+.app-toast.ok{border-left:4px solid var(--ok)}
+.app-toast.err{border-left:4px solid var(--bad)}
+.app-toast.warn{border-left:4px solid var(--warn)}
+.app-toast.info{border-left:4px solid var(--info)}
 @keyframes tin{from{transform:translateX(20px);opacity:0}to{transform:translateX(0);opacity:1}}
 
 #loader{position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;align-items:center;justify-content:center;z-index:3000}
@@ -443,7 +443,7 @@ const esc = (s)=> String(s==null?'':s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":
 function toast(msg,type='info'){
   const c = $('#toast-container');
   const el = document.createElement('div');
-  el.className = `toast ${type}`;
+  el.className = `app-toast ${type}`;
   el.innerHTML = `<i class="bi ${ {ok:'bi-check-circle-fill',err:'bi-x-circle-fill',warn:'bi-exclamation-triangle-fill',info:'bi-info-circle-fill'}[type] }" style="color:var(--${ {ok:'ok',err:'bad',warn:'warn',info:'info'}[type] })"></i><div>${esc(msg)}</div>`;
   c.appendChild(el);
   setTimeout(()=>{ el.style.opacity='0'; el.style.transition='opacity .3s'; setTimeout(()=>el.remove(),300); }, 3500);

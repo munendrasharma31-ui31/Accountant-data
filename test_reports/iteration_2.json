@@ -1,0 +1,49 @@
+{
+  "summary": "Iteration 2 frontend E2E smoke on /hrms.html. (1) Toast bug fix VERIFIED: .app-toast 'Enter your email first' appears immediately on empty forgot-password click and remains visible >2s — Bootstrap/.toast collision is resolved. (2) Login → Dashboard works. (3) Employees CRUD: Add modal opens, retirement auto-calc correct for BOTH rules (DOB 1980-06-15 → 2040-06-30; DOB 1990-01-01 → 2049-12-31). Save shows '.app-toast Saved successfully', modal closes, header reports '1 record(s) · Live updates from Firestore'. (4) Theme toggle works (light↔dark via documentElement.dataset.theme). (5) Sign-out via #logout-btn returns to login. CRITICAL FINDING: The logged-in admin@iaad.gov.in has STATE.role='user' (top-right badge reads 'USER'), not 'super_admin'. As a result the admin-only nav items 'Users' (nav-users) and 'Audit Logs' (nav-auditLogs) are NOT rendered in the sidebar, and Steps 6–7 of the review request could not be exercised. The other 'missing' testids (nav-deathRegister, nav-predefinedReports) likely fail only because of testid casing — both items DO appear in the sidebar visually. No uncaught JS errors; only the acceptable Firestore permissions warning was logged.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Sidebar / Role bootstrap", "issue": "admin@iaad.gov.in is provisioned with role='user' in the Firestore users/{uid} doc, so nav-users and nav-auditLogs are not rendered (adminOnly:true gated by STATE.role==='super_admin'). Top-right user badge confirms role is 'USER'. The seed-on-first-login path at line ~1843 uses `allU.empty?'super_admin':'user'` which yields 'user' once any users doc exists — there is no fallback that elevates the well-known seed email admin@iaad.gov.in to super_admin when a stale 'user' doc already exists for it.", "selector": "[data-testid=\"nav-users\"], [data-testid=\"nav-auditLogs\"]", "priority": "HIGH"}
+    ],
+    "integration_issues": [
+      {"flow": "Employees table rendering after save", "issue": "Header says '1 record(s) · Live updates from Firestore' (Firestore listener fired) but the row was not visible in tbody at the time of inspection. Probably a slow render or a tbody re-mount race. Worth a quick check that the table body re-renders synchronously when the Firestore snapshot updates.", "affected_selectors": ["table tbody tr"]}
+    ],
+    "design_issues": []
+  },
+  "verifications_passed": [
+    "Forgot-password empty-email: .app-toast 'Enter your email first' visible within 1s and persists >2s (Bootstrap collision FIXED)",
+    "Login admin@iaad.gov.in / Admin@12345 navigates to Dashboard; sidebar + topbar render",
+    "Sidebar items visible: Dashboard, Employees, Postings, Offices, Additional Charges, Attachments, Promotion Forgo, Retirements, Death Register, Predefined Reports, Custom Reports, Settings",
+    "Employees → Add modal: form fields manavSampadaId/name/dob/dateOfJoining/retirementDate/... all rendered",
+    "Retirement rule (DOB not on 1st): 1980-06-15 → 2040-06-30",
+    "Retirement rule (DOB on day 1): 1990-01-01 → 2049-12-31",
+    "Save: .app-toast 'Saved successfully' shown within 5s and modal auto-closed; Firestore record created",
+    "Theme toggle: documentElement.dataset.theme flips light↔dark on each click",
+    "Sign-out via #logout-btn returns to login screen",
+    "No uncaught JS errors; only acceptable FirebaseError: Missing or insufficient permissions. warning"
+  ],
+  "verifications_blocked": [
+    "Users page (nav-users) — sidebar item not rendered because STATE.role !== 'super_admin'",
+    "Audit Logs page (nav-auditLogs) — same root cause as above",
+    "add-user-btn visibility — page unreachable"
+  ],
+  "test_report_links": [],
+  "action_items": [
+    "FIX role bootstrap so admin@iaad.gov.in is always super_admin: in auth.onAuthStateChanged (~line 1843), when creating the doc for the seed email force role='super_admin' regardless of allU.empty. Additionally, when udoc.exists and email==='admin@iaad.gov.in' but role!=='super_admin', upgrade the doc (admin.set({role:'super_admin'},{merge:true})) so existing stale 'user' docs self-heal. This will unblock Users + Audit Logs UI for the seed admin.",
+    "Investigate Employees table tbody not showing the saved row immediately even though the count badge updated to '1 record(s)'. Confirm the renderTable() is invoked by the onSnapshot callback after save and that the row template runs.",
+    "Minor: align data-testid casing in tests/docs — sidebar uses nav-${m.key} so death register is nav-deathRegister (camelCase) and predefined reports is nav-predefinedReports; both exist when role permits."
+  ],
+  "critical_code_review_comments": [
+    "Role bootstrap is brittle: a single stale users/{uid} doc with role='user' permanently locks the seed admin out of admin-only sections. Add an explicit override for the well-known seed email or seed the doc from server-side.",
+    "Single 1894-line index.html exceeds the recommended ~700-line module size — already flagged in iteration_1; consider splitting into modules.",
+    "Firestore listener → table render path should be idempotent and resilient to fast successive snapshots (saw stale tbody after a successful save)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (frontend-only)", "frontend": "~82% (toast fix verified, employee CRUD + retirement rules verified, theme + logout verified; Users/Audit Logs steps blocked by role-seed bug)"},
+  "test_credentials": "admin@iaad.gov.in / Admin@12345 — login successful but provisioned with role='user' (not super_admin) in this sandbox.",
+  "seed_data_creation": "Created 1 Firestore employee TEST001 'Test Employee' dob 1980-06-15 retirement 2040-06-30. TEST002 was filled but NOT saved (modal cancelled after verifying retirement calc).",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Toast fix (.app-toast) is VERIFIED working. Employee add + retirement auto-calc + Save toast + theme toggle + logout all WORKING. The remaining gap is the role-seed bug: admin@iaad.gov.in resolves to STATE.role='user' so Users and Audit Logs nav items don't render. After the main agent applies the role-elevation fix, re-run only Steps 6–7 (nav-users, nav-auditLogs, add-user-btn visibility) and confirm the top-right user badge reads 'super_admin' instead of 'USER'. Also re-check that Employees tbody re-renders the new row immediately after Save (count badge updated to 1 but row wasn't visible at the moment of inspection).",
+  "rca_of_the_issue": "auth.onAuthStateChanged at ~line 1843 uses `const role = allU.empty?'super_admin':'user';` when creating a missing user doc. If the users collection already contains any doc (e.g. seedSuper or a prior partial sign-in), the seed admin email is assigned role='user'. There is no branch that (a) special-cases admin@iaad.gov.in to always be super_admin, or (b) heals an existing doc whose role is not super_admin. Combined with `adminOnly && STATE.role!=='super_admin'` filter in buildSidebar (line 1763), the Users and Audit Logs entries disappear from the sidebar entirely. Reproduction: log in as admin@iaad.gov.in → inspect top-right user-role span → reads 'user' instead of 'super_admin'. Mitigation: in onAuthStateChanged, if user.email.toLowerCase()==='admin@iaad.gov.in' force role='super_admin' both on doc-create AND when existing doc has a lower role (merge update)."
+}
