@@ -1005,11 +1005,11 @@ function renderListPage(modKey){
 function renderTable(modKey){
   const mod = MODULES[modKey];
   const tbl = `#dt-${modKey}`;
-  if($.fn.DataTable && $.fn.dataTable.isDataTable(tbl)){ $(tbl).DataTable().destroy(); }
+  if(jQuery.fn.DataTable && jQuery.fn.dataTable.isDataTable(tbl)){ jQuery(tbl).DataTable().destroy(); }
   const data = enrichRows(modKey, STATE.data[modKey]);
   if(modKey==='offices') computeOfficeStats();
   const isAdmin = STATE.role === 'super_admin';
-  $(`${tbl} tbody`).html(data.map(row=>`<tr>${mod.columns.map(c=>{
+  jQuery(`${tbl} tbody`).html(data.map(row=>`<tr>${mod.columns.map(c=>{
     let v = row[c.key];
     if(c.render) v = c.render(v);
     else v = esc(v==null?'':v);
@@ -1019,7 +1019,7 @@ function renderTable(modKey){
     <button class="btn btn-sm btn-outline-primary" onclick="openForm('${modKey}','${row.id}')" title="Edit" data-testid="edit-${row.id}"><i class="bi bi-pencil"></i></button>
     ${isAdmin?`<button class="btn btn-sm btn-outline-danger" onclick="deleteRecord('${modKey}','${row.id}')" title="Delete" data-testid="delete-${row.id}"><i class="bi bi-trash"></i></button>`:''}
   </td></tr>`).join(''));
-  $(tbl).DataTable({
+  jQuery(tbl).DataTable({
     pageLength:25,
     lengthMenu:[10,25,50,100,200],
     order: [],
@@ -1483,7 +1483,7 @@ function runReport(key){
       <div class="table-responsive"><table id="rpt-table" class="table table-sm table-striped"><thead><tr>${cols.map(c=>`<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${data.map(r=>`<tr>${r.map(c=>`<td>${esc(c==null?'':c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
       <div class="text-muted small mt-2">${data.length} record(s)</div>
     </div>`;
-  $('#rpt-table').DataTable({pageLength:25,lengthMenu:[10,25,50,100]});
+  jQuery('#rpt-table').DataTable({pageLength:25,lengthMenu:[10,25,50,100]});
 }
 function downloadCustomReport(cols,rows,fmt,title){
   if(fmt==='xlsx'){
@@ -1584,7 +1584,7 @@ function runCustomReport(){
       <div class="table-responsive"><table id="cr-table" class="table table-sm table-striped"><thead><tr>${labels.map(l=>`<th>${esc(l)}</th>`).join('')}</tr></thead><tbody>${data.map(r=>`<tr>${r.map(c=>`<td>${esc(c==null?'':c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
       <div class="text-muted small mt-2">${rows.length} record(s)</div>
     </div>`;
-  $('#cr-table').DataTable({pageLength:25});
+  jQuery('#cr-table').DataTable({pageLength:25});
 }
 async function saveCustomReport(){
   const name = prompt('Report name?');
@@ -1617,7 +1617,7 @@ function renderUsers(){
         <button class="btn btn-sm btn-outline-primary" onclick="openUserForm('${u.id}')" data-testid="edit-user-${u.id}"><i class="bi bi-pencil"></i></button>
         <button class="btn btn-sm btn-outline-${u.active!==false?'warning':'success'}" onclick="toggleUser('${u.id}')" title="${u.active!==false?'Deactivate':'Activate'}"><i class="bi ${u.active!==false?'bi-pause':'bi-play'}"></i></button>
       </td></tr>`).join('')}</tbody></table></div></div>`;
-  $('#dt-users').DataTable({pageLength:25});
+  jQuery('#dt-users').DataTable({pageLength:25});
 }
 function openUserForm(id=null){
   const existing = id ? STATE.data.users.find(u=>u.id===id) : {};
@@ -1684,7 +1684,7 @@ function renderAuditLogs(){
       <td>${esc(l.module)}</td>
       <td style="font-size:11px;color:var(--muted)">${esc(l.recordId||'')}</td>
     </tr>`).join('')}</tbody></table></div></div>`;
-  $('#dt-audit').DataTable({pageLength:50, order:[[0,'desc']]});
+  jQuery('#dt-audit').DataTable({pageLength:50, order:[[0,'desc']]});
 }
 
 /* ---------- SETTINGS ---------- */
