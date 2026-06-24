@@ -536,20 +536,22 @@ async function handleLogin(email,pwd){
       } else { throw signInErr; }
     }
     let udoc = await db.collection('users').doc(cred.user.uid).get();
+    const isSeed = email.toLowerCase() === 'admin@iaad.gov.in';
     if(!udoc.exists){
-      // bootstrap as super admin if no user docs at all, else default to user
-      let role = 'user';
+      let role = isSeed ? 'super_admin' : 'user';
       try{
         const allUsers = await db.collection('users').limit(1).get();
         if(allUsers.empty) role = 'super_admin';
       }catch(e){
-        // If we cannot read users due to rules, seed first user as super_admin
-        if(email.toLowerCase() === 'admin@iaad.gov.in') role = 'super_admin';
+        if(isSeed) role = 'super_admin';
       }
       await db.collection('users').doc(cred.user.uid).set({
         email: cred.user.email, name: email.split('@')[0], role, active: true,
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
+      udoc = await db.collection('users').doc(cred.user.uid).get();
+    } else if(isSeed && udoc.data().role !== 'super_admin'){
+      await db.collection('users').doc(cred.user.uid).set({role:'super_admin', active:true},{merge:true});
       udoc = await db.collection('users').doc(cred.user.uid).get();
     }
     const profile = udoc.data();
@@ -1837,11 +1839,20 @@ auth.onAuthStateChanged(async user=>{
   if(user){
     showLoader();
     try{
+      const SEED_ADMIN = 'admin@iaad.gov.in';
+      const isSeed = (user.email||'').toLowerCase() === SEED_ADMIN;
       let udoc = await db.collection('users').doc(user.uid).get();
       if(!udoc.exists){
-        const allU = await db.collection('users').limit(1).get();
-        const role = allU.empty?'super_admin':'user';
+        let role = 'user';
+        if(isSeed){ role = 'super_admin'; }
+        else {
+          try{ const allU = await db.collection('users').limit(1).get(); if(allU.empty) role='super_admin'; }catch(e){}
+        }
         await db.collection('users').doc(user.uid).set({email:user.email,name:user.email.split('@')[0],role,active:true,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+        udoc = await db.collection('users').doc(user.uid).get();
+      } else if(isSeed && udoc.data().role !== 'super_admin'){
+        // Self-heal seed admin role
+        await db.collection('users').doc(user.uid).set({role:'super_admin', active:true},{merge:true});
         udoc = await db.collection('users').doc(user.uid).get();
       }
       const p = udoc.data();
