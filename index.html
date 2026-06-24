@@ -1,0 +1,1893 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IAAD HRMS — Internal Accounts & Audit Directorate</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;500;600;700&family=Sora:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+<link href="https://cdn.datatables.net/2.1.8/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+<link href="https://cdn.datatables.net/buttons/3.1.2/css/buttons.bootstrap5.min.css" rel="stylesheet">
+<style>
+:root{
+  --brand:#0b3d2e; --brand-2:#10663f; --accent:#b8862a; --accent-2:#d4a64a;
+  --bg:#f4f1ea; --panel:#ffffff; --ink:#1a1a1a; --muted:#5a6470; --border:#e2dcce;
+  --ok:#1f8a4e; --warn:#c98a16; --bad:#b3261e; --info:#1a6fb0;
+  --sidebar-w:260px; --topbar-h:60px;
+}
+[data-theme="dark"]{
+  --brand:#0d4d3a; --brand-2:#16805a; --accent:#d4a64a; --accent-2:#e8c171;
+  --bg:#0f1418; --panel:#171d23; --ink:#e8ecef; --muted:#8a96a3; --border:#252e36;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;font-family:'Sora','Noto Sans Devanagari',system-ui,sans-serif;background:var(--bg);color:var(--ink);font-size:14px;letter-spacing:.1px}
+.devanagari{font-family:'Noto Sans Devanagari','Sora',sans-serif}
+a{color:var(--brand-2);text-decoration:none}
+a:hover{color:var(--accent)}
+.btn{font-weight:500;border-radius:8px;padding:.5rem 1rem;transition:transform .15s, box-shadow .15s}
+.btn:active{transform:translateY(1px)}
+.btn-primary{background:var(--brand);border-color:var(--brand)}
+.btn-primary:hover{background:var(--brand-2);border-color:var(--brand-2)}
+.btn-outline-primary{color:var(--brand);border-color:var(--brand)}
+.btn-outline-primary:hover{background:var(--brand);border-color:var(--brand);color:#fff}
+.btn-accent{background:var(--accent);border-color:var(--accent);color:#1a1a1a}
+.btn-accent:hover{background:var(--accent-2);border-color:var(--accent-2);color:#1a1a1a}
+.form-control,.form-select{background:var(--panel);color:var(--ink);border:1px solid var(--border);border-radius:8px}
+.form-control:focus,.form-select:focus{background:var(--panel);color:var(--ink);border-color:var(--brand-2);box-shadow:0 0 0 .2rem rgba(16,102,63,.12)}
+.form-label{font-weight:500;color:var(--ink);margin-bottom:.25rem;font-size:.85rem}
+.modal-content{background:var(--panel);color:var(--ink);border:1px solid var(--border);border-radius:14px}
+.modal-header,.modal-footer{border-color:var(--border)}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:14px;color:var(--ink)}
+.table{color:var(--ink);--bs-table-bg:transparent}
+.table>:not(caption)>*>*{border-bottom-color:var(--border)}
+.dataTables_wrapper{color:var(--ink)}
+.dataTables_wrapper .dataTables_info,.dataTables_wrapper .dataTables_length,.dataTables_wrapper .dataTables_filter{color:var(--muted);font-size:.85rem}
+.dt-buttons .btn{margin-right:.35rem}
+table.dataTable thead th{background:rgba(11,61,46,.06);color:var(--ink);border-bottom:1px solid var(--border)}
+[data-theme="dark"] table.dataTable thead th{background:rgba(16,128,90,.12)}
+table.dataTable tbody tr:hover{background:rgba(184,134,42,.08)}
+.page-item .page-link{background:var(--panel);color:var(--ink);border-color:var(--border)}
+.page-item.active .page-link{background:var(--brand);border-color:var(--brand);color:#fff}
+.badge-pill{padding:.35em .7em;border-radius:999px;font-weight:600;font-size:.72rem;letter-spacing:.3px}
+.b-working{background:rgba(31,138,78,.15);color:var(--ok)}
+.b-retired{background:rgba(201,138,22,.15);color:var(--warn)}
+.b-deceased{background:rgba(179,38,30,.15);color:var(--bad)}
+.b-promoted{background:rgba(26,111,176,.15);color:var(--info)}
+.b-attached{background:rgba(127,86,217,.15);color:#7f56d9}
+.b-suspended{background:rgba(120,120,120,.18);color:var(--muted)}
+.b-active{background:rgba(31,138,78,.15);color:var(--ok)}
+.b-inactive{background:rgba(120,120,120,.18);color:var(--muted)}
+
+/* AUTH SCREEN */
+#auth-screen{position:fixed;inset:0;display:flex;align-items:stretch;background:linear-gradient(135deg,#0b3d2e 0%,#10663f 50%,#0b3d2e 100%)}
+#auth-screen::before{content:"";position:absolute;inset:0;background-image:radial-gradient(rgba(255,255,255,.04) 1px,transparent 1px);background-size:24px 24px;pointer-events:none}
+.auth-left{flex:1.1;color:#fff;padding:60px;display:flex;flex-direction:column;justify-content:space-between;position:relative;z-index:2}
+.auth-left .crest{width:64px;height:64px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;color:#0b3d2e;font-weight:800;font-size:28px;box-shadow:0 0 0 4px rgba(255,255,255,.1)}
+.auth-left h1{font-size:46px;font-weight:800;line-height:1.05;margin:32px 0 12px}
+.auth-left .tag{opacity:.85;font-size:16px;max-width:480px;line-height:1.55}
+.auth-left .features{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:32px;max-width:520px}
+.auth-left .features div{display:flex;align-items:flex-start;gap:10px;font-size:13px;opacity:.92}
+.auth-left .features i{color:var(--accent-2);font-size:18px;margin-top:2px}
+.auth-left .footer{font-size:12px;opacity:.7}
+.auth-right{flex:1;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:40px;position:relative;z-index:2}
+.auth-card{width:100%;max-width:420px;background:var(--panel);border-radius:16px;padding:36px;box-shadow:0 30px 80px -20px rgba(0,0,0,.3);border:1px solid var(--border)}
+.auth-card h2{font-size:24px;font-weight:700;margin-bottom:6px}
+.auth-card .sub{color:var(--muted);margin-bottom:28px;font-size:13px}
+@media(max-width:900px){.auth-left{display:none}.auth-right{flex:1}}
+
+/* APP SHELL */
+#app-shell{display:none;min-height:100vh}
+#app-shell.active{display:block}
+.sidebar{position:fixed;top:0;left:0;bottom:0;width:var(--sidebar-w);background:var(--brand);color:#e8ecef;padding:0;display:flex;flex-direction:column;z-index:1030;transition:transform .25s}
+.sidebar .brand{padding:18px 20px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;gap:12px;align-items:center}
+.sidebar .brand .crest{width:38px;height:38px;border-radius:50%;background:var(--accent);color:#0b3d2e;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px}
+.sidebar .brand .t{font-weight:700;font-size:14px;line-height:1.2}
+.sidebar .brand .s{font-size:11px;opacity:.7}
+.sidebar nav{flex:1;overflow-y:auto;padding:10px 8px}
+.sidebar nav .nav-item{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:8px;color:rgba(255,255,255,.78);cursor:pointer;font-weight:500;font-size:13px;margin-bottom:2px;border-left:3px solid transparent}
+.sidebar nav .nav-item:hover{background:rgba(255,255,255,.06);color:#fff}
+.sidebar nav .nav-item.active{background:rgba(184,134,42,.18);color:#fff;border-left-color:var(--accent)}
+.sidebar nav .nav-item i{font-size:16px;width:18px;text-align:center}
+.sidebar nav .nav-section{padding:14px 14px 6px;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;opacity:.5;font-weight:600}
+.sidebar .sb-foot{padding:12px 16px;border-top:1px solid rgba(255,255,255,.08);font-size:11px;opacity:.7}
+
+.topbar{position:fixed;top:0;left:var(--sidebar-w);right:0;height:var(--topbar-h);background:var(--panel);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 24px;gap:16px;z-index:1020}
+.topbar .search{flex:1;max-width:520px;position:relative}
+.topbar .search input{padding-left:38px;border-radius:999px;background:var(--bg);border:1px solid var(--border)}
+.topbar .search i{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--muted)}
+.topbar .user-chip{display:flex;align-items:center;gap:10px;padding:6px 14px 6px 6px;border-radius:999px;border:1px solid var(--border);background:var(--bg);cursor:pointer}
+.topbar .user-chip .av{width:32px;height:32px;border-radius:50%;background:var(--brand);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px}
+.topbar .user-chip .nm{font-size:13px;font-weight:600;line-height:1.1}
+.topbar .user-chip .rl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px}
+.topbar .icon-btn{width:38px;height:38px;border-radius:50%;border:1px solid var(--border);background:var(--bg);color:var(--ink);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.topbar .icon-btn:hover{background:var(--brand);color:#fff;border-color:var(--brand)}
+
+.main{margin-left:var(--sidebar-w);padding:calc(var(--topbar-h) + 24px) 28px 40px}
+.page-head{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:24px;gap:12px;flex-wrap:wrap}
+.page-head h1{font-size:28px;font-weight:700;margin:0;letter-spacing:-.5px}
+.page-head .sub{color:var(--muted);font-size:13px;margin-top:4px}
+
+.kpi{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;margin-bottom:24px}
+.kpi-card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:18px;position:relative;overflow:hidden}
+.kpi-card .lbl{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-weight:600;margin-bottom:6px}
+.kpi-card .val{font-size:30px;font-weight:700;line-height:1}
+.kpi-card .sub{font-size:11px;color:var(--muted);margin-top:6px}
+.kpi-card .ic{position:absolute;right:12px;top:12px;width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px}
+.kpi-card.green .ic{background:rgba(31,138,78,.15);color:var(--ok)}
+.kpi-card.amber .ic{background:rgba(201,138,22,.15);color:var(--warn)}
+.kpi-card.red .ic{background:rgba(179,38,30,.15);color:var(--bad)}
+.kpi-card.blue .ic{background:rgba(26,111,176,.15);color:var(--info)}
+.kpi-card.brand .ic{background:rgba(11,61,46,.12);color:var(--brand)}
+
+.chart-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:16px;margin-bottom:24px}
+.chart-card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:18px}
+.chart-card h3{font-size:14px;font-weight:600;margin:0 0 12px}
+.chart-card .wrap{position:relative;height:280px}
+
+.toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;gap:12px;flex-wrap:wrap}
+.toolbar .actions{display:flex;gap:8px;flex-wrap:wrap}
+.section-card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:16px}
+
+.toast-container{position:fixed;top:80px;right:24px;z-index:2000}
+.toast{background:var(--panel);color:var(--ink);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:8px;min-width:260px;box-shadow:0 6px 20px -8px rgba(0,0,0,.25);display:flex;gap:10px;animation:tin .25s ease}
+.toast.ok{border-left:4px solid var(--ok)}
+.toast.err{border-left:4px solid var(--bad)}
+.toast.warn{border-left:4px solid var(--warn)}
+.toast.info{border-left:4px solid var(--info)}
+@keyframes tin{from{transform:translateX(20px);opacity:0}to{transform:translateX(0);opacity:1}}
+
+#loader{position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;align-items:center;justify-content:center;z-index:3000}
+#loader.active{display:flex}
+#loader .sp{width:54px;height:54px;border:4px solid rgba(255,255,255,.2);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.global-results{position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--panel);border:1px solid var(--border);border-radius:10px;max-height:420px;overflow-y:auto;display:none;box-shadow:0 10px 30px -10px rgba(0,0,0,.2);z-index:1100}
+.global-results.show{display:block}
+.global-results .gr-item{padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;justify-content:space-between;gap:10px}
+.global-results .gr-item:hover{background:rgba(184,134,42,.08)}
+.global-results .gr-section{padding:6px 14px;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);background:var(--bg);font-weight:600}
+
+.empty{text-align:center;padding:60px 20px;color:var(--muted)}
+.empty i{font-size:48px;display:block;margin-bottom:14px;opacity:.4}
+
+.tabs-pill{display:inline-flex;background:var(--bg);border:1px solid var(--border);border-radius:999px;padding:4px;gap:2px;margin-bottom:14px}
+.tabs-pill button{border:0;background:transparent;padding:6px 14px;border-radius:999px;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer}
+.tabs-pill button.active{background:var(--brand);color:#fff}
+
+@media(max-width:992px){
+  .sidebar{transform:translateX(-100%)}
+  .sidebar.open{transform:translateX(0)}
+  .topbar{left:0}
+  .main{margin-left:0;padding:calc(var(--topbar-h) + 16px) 14px 30px}
+  .auth-left{display:none}
+}
+
+.dual-label{display:flex;flex-direction:column;line-height:1.05}
+.dual-label .en{font-size:13px;font-weight:500}
+.dual-label .hi{font-size:11px;opacity:.75;font-family:'Noto Sans Devanagari',sans-serif}
+
+input[type="file"]::file-selector-button{background:var(--brand);color:#fff;border:0;padding:6px 12px;border-radius:6px;margin-right:10px;cursor:pointer}
+
+/* Profile photo */
+.photo-thumb{width:36px;height:36px;border-radius:50%;object-fit:cover;border:1px solid var(--border)}
+.photo-lg{width:120px;height:120px;border-radius:50%;object-fit:cover;border:2px solid var(--border)}
+
+/* Print */
+@media print{
+  .sidebar,.topbar,.no-print{display:none!important}
+  .main{margin:0;padding:0}
+  body{background:#fff;color:#000}
+}
+</style>
+</head>
+<body>
+
+<!-- AUTH SCREEN -->
+<div id="auth-screen">
+  <div class="auth-left">
+    <div>
+      <div class="crest">IA</div>
+      <h1>HRMS Portal<br><span style="opacity:.85;font-size:24px;font-weight:600" class="devanagari">मानव संसाधन प्रबंधन</span></h1>
+      <p class="tag">Internal Accounts and Audit Directorate — Government Accountant Cadre. Real-time workforce, postings, vacancy and retirement intelligence.</p>
+      <div class="features">
+        <div><i class="bi bi-shield-check"></i><div><b>Role-based access</b><br>Super Admin & User roles with audit trail</div></div>
+        <div><i class="bi bi-graph-up"></i><div><b>Live dashboards</b><br>Vacancy, district & retirement forecast</div></div>
+        <div><i class="bi bi-arrow-repeat"></i><div><b>Auto-calculations</b><br>Retirement date, filled/vacant posts</div></div>
+        <div><i class="bi bi-file-earmark-spreadsheet"></i><div><b>Excel & PDF</b><br>Bulk import/export, custom MIS reports</div></div>
+      </div>
+    </div>
+    <div class="footer">© <span id="yr"></span> Internal Accounts & Audit Directorate · आन्तरिक लेखा एवं लेखा परीक्षा निदेशालय</div>
+  </div>
+  <div class="auth-right">
+    <div class="auth-card">
+      <h2>Sign in</h2>
+      <p class="sub">Use your authorised credentials to access the HRMS portal.</p>
+      <form id="login-form" data-testid="login-form">
+        <div class="mb-3">
+          <label class="form-label">Email</label>
+          <input type="email" id="login-email" class="form-control" required autocomplete="username" data-testid="login-email-input" placeholder="you@iaad.gov.in">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Password</label>
+          <input type="password" id="login-password" class="form-control" required autocomplete="current-password" data-testid="login-password-input" placeholder="••••••••">
+        </div>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="remember-me" checked>
+            <label class="form-check-label" for="remember-me" style="font-size:12px;color:var(--muted)">Keep me signed in</label>
+          </div>
+          <a href="#" id="forgot-link" style="font-size:12px" data-testid="forgot-password-link">Forgot password?</a>
+        </div>
+        <button type="submit" class="btn btn-primary w-100" data-testid="login-submit-btn"><i class="bi bi-box-arrow-in-right me-1"></i> Sign in</button>
+        <div id="login-error" class="text-danger mt-3 small" style="display:none" data-testid="login-error"></div>
+      </form>
+      <div class="mt-4 text-center" style="font-size:11px;color:var(--muted)">
+        First-time setup? Default Super Admin will be auto-seeded on first launch.
+      </div>
+      <div class="text-center mt-2">
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="rules-help-btn" style="display:none;font-size:11px" data-bs-toggle="modal" data-bs-target="#rules-modal"><i class="bi bi-shield-lock"></i> Setup Help — Firestore Rules</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- APP SHELL -->
+<div id="app-shell">
+
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="crest">IA</div>
+      <div>
+        <div class="t">IAAD HRMS</div>
+        <div class="s devanagari">आन्तरिक लेखा एवं लेखा परीक्षा</div>
+      </div>
+    </div>
+    <nav id="sidebar-nav"></nav>
+    <div class="sb-foot">v1.0 · Production · GitHub Pages ready</div>
+  </aside>
+
+  <header class="topbar">
+    <button class="icon-btn d-lg-none" id="sidebar-toggle" data-testid="sidebar-toggle"><i class="bi bi-list"></i></button>
+    <div class="search">
+      <i class="bi bi-search"></i>
+      <input type="search" id="global-search" class="form-control" placeholder="Search employees, offices, postings…" autocomplete="off" data-testid="global-search-input">
+      <div class="global-results" id="global-results"></div>
+    </div>
+    <button class="icon-btn" id="theme-toggle" title="Toggle theme" data-testid="theme-toggle-btn"><i class="bi bi-moon-stars"></i></button>
+    <div class="user-chip" data-bs-toggle="dropdown" data-testid="user-menu-chip">
+      <div class="av" id="user-av">U</div>
+      <div>
+        <div class="nm" id="user-name">User</div>
+        <div class="rl" id="user-role">role</div>
+      </div>
+      <i class="bi bi-chevron-down" style="font-size:11px;color:var(--muted)"></i>
+    </div>
+    <ul class="dropdown-menu dropdown-menu-end">
+      <li><a class="dropdown-item" href="#" data-nav="settings"><i class="bi bi-gear me-2"></i>Settings</a></li>
+      <li><a class="dropdown-item" href="#" id="change-pwd-link"><i class="bi bi-key me-2"></i>Change Password</a></li>
+      <li><hr class="dropdown-divider"></li>
+      <li><a class="dropdown-item text-danger" href="#" id="logout-btn" data-testid="logout-btn"><i class="bi bi-box-arrow-right me-2"></i>Sign out</a></li>
+    </ul>
+  </header>
+
+  <main class="main" id="main-view"></main>
+</div>
+
+<div id="loader"><div class="sp"></div></div>
+<div class="toast-container" id="toast-container"></div>
+
+<!-- Universal Modal -->
+<div class="modal fade" id="universal-modal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="um-title">Modal</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="um-body"></div>
+      <div class="modal-footer" id="um-footer"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Rules Setup Modal -->
+<div class="modal fade" id="rules-modal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title"><i class="bi bi-shield-lock"></i> One-Time Setup: Firestore Security Rules</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <ol style="font-size:13px">
+          <li>Open <a href="https://console.firebase.google.com/project/accountant-1e319/firestore/rules" target="_blank" rel="noopener">Firebase Console → Firestore → Rules</a></li>
+          <li>Replace the existing rules with the snippet below</li>
+          <li>Click <b>Publish</b> and try signing in again</li>
+        </ol>
+        <pre style="background:var(--bg);padding:14px;border-radius:8px;font-size:11px;border:1px solid var(--border);overflow-x:auto" id="rules-pre">rules_version = '2';
+service cloud.firestore {
+  match /databases/{db}/documents {
+    function isAuth(){ return request.auth != null; }
+    function role(){ return get(/databases/$(db)/documents/users/$(request.auth.uid)).data.role; }
+    function isAdmin(){ return isAuth() &amp;&amp; role() == 'super_admin'; }
+    match /users/{uid} {
+      allow read: if isAuth();
+      allow create: if request.auth.uid == uid;
+      allow update, delete: if isAdmin() || request.auth.uid == uid;
+    }
+    match /auditLogs/{id} { allow read: if isAdmin(); allow create: if isAuth(); }
+    match /{col}/{id} {
+      allow read: if isAuth();
+      allow create, update: if isAuth();
+      allow delete: if isAdmin();
+    }
+  }
+}</pre>
+        <button class="btn btn-sm btn-primary" onclick="navigator.clipboard.writeText(document.getElementById('rules-pre').innerText);this.innerHTML='<i class=&quot;bi bi-check&quot;></i> Copied'"><i class="bi bi-clipboard"></i> Copy to clipboard</button>
+      </div>
+      <div class="modal-footer"><button class="btn btn-light" data-bs-dismiss="modal">Close</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm Modal -->
+<div class="modal fade" id="confirm-modal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title" id="cm-title">Confirm</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body"><p id="cm-message">Are you sure?</p></div>
+      <div class="modal-footer">
+        <button class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-danger" id="cm-confirm" data-testid="confirm-yes-btn">Confirm</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Firebase compat SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
+
+<!-- Libs -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.datatables.net/2.1.8/js/dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/2.1.8/js/dataTables.bootstrap5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/3.1.2/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/3.1.2/js/buttons.bootstrap5.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+
+<script>
+/* =============================================================
+   IAAD HRMS — Single File Production App
+   ============================================================= */
+const firebaseConfig = {
+  apiKey: "AIzaSyB2PqZCo81ke7JjzZU1rZ8QAu7pEr4EODo",
+  authDomain: "accountant-1e319.firebaseapp.com",
+  databaseURL: "https://accountant-1e319-default-rtdb.firebaseio.com",
+  projectId: "accountant-1e319",
+  storageBucket: "accountant-1e319.firebasestorage.app",
+  messagingSenderId: "739708292976",
+  appId: "1:739708292976:web:e3bedee08fd6224f8f49b5",
+  measurementId: "G-KS2VD1CLBP"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+const storage = firebase.storage();
+
+document.getElementById('yr').textContent = new Date().getFullYear();
+
+/* ---------- STATE ---------- */
+const STATE = {
+  user: null,
+  profile: null,
+  role: null,
+  active: 'dashboard',
+  data: {
+    employees: [], postings: [], offices: [], additionalCharges: [],
+    attachments: [], promotionForgo: [], retirements: [], deceased: [],
+    users: [], auditLogs: [], settings: {}
+  },
+  unsub: [],
+  charts: {}
+};
+
+/* ---------- MANDAL-JILA SEED ---------- */
+const MANDAL_JILA = [["आगरा","आगरा"],["आगरा","मथुरा"],["आगरा","मैनपुरी"],["आगरा","फिरोजाबाद"],["अलीगढ़","अलीगढ़"],["अलीगढ़","एटा"],["अलीगढ़","हाथरस"],["अलीगढ़","कासगंज"],["अयोध्या","अम्बेडकर नगर"],["अयोध्या","अयोध्या"],["अयोध्या","सुलतानपुर"],["अयोध्या","अमेठी"],["अयोध्या","बाराबंकी"],["आजमगढ","आजमगढ़"],["आजमगढ","बलिया"],["आजमगढ","मऊ"],["बरेली","बदायॅू"],["बरेली","बरेली"],["बरेली","पीलीभीत"],["बरेली","शाहजहॉपुर"],["बस्ती","बस्ती"],["बस्ती","संत कबीर नगर"],["बस्ती","सिद्धार्थ नगर"],["चित्रकूट","बांदा"],["चित्रकूट","चित्रकूट"],["चित्रकूट","हमीरपुर"],["चित्रकूट","महोबा"],["देवीपाटन","बलरामपुर"],["देवीपाटन","गोण्डा"],["देवीपाटन","बहराइच"],["देवीपाटन","श्रावस्ती"],["गोरखपुर","गोरखपुर"],["गोरखपुर","कुशीनगर"],["गोरखपुर","महराजगंज"],["गोरखपुर","देवरिया"],["झांसी","जालौन (उरई)"],["झांसी","झॉसी"],["झांसी","ललितपुर"],["कानपुर","औरैया"],["कानपुर","इटावा"],["कानपुर","फर्रूखाबाद"],["कानपुर","कन्नौज"],["कानपुर","कानपुर देहात"],["कानपुर","कानपुर नगर"],["लखनऊ","हरदोई"],["लखनऊ","लखीमपुर खीरी"],["लखनऊ","लखनऊ"],["लखनऊ","रायबरेली"],["लखनऊ","सीतापुर"],["लखनऊ","उन्नाव"],["मेरठ","बागपत"],["मेरठ","बुलन्दशहर"],["मेरठ","गौतमबुद्ध नगर"],["मेरठ","गाजियाबाद"],["मेरठ","मेरठ"],["मेरठ","हापुड़"],["मिर्जापुर","मिर्जापुर"],["मिर्जापुर","भदोही"],["मिर्जापुर","सोनभद्र"],["मुरादाबाद","बिजनौर"],["मुरादाबाद","अमरोहा"],["मुरादाबाद","मुरादाबाद"],["मुरादाबाद","रामपुर"],["मुरादाबाद","सम्भल"],["प्रयागराज","प्रयागराज"],["प्रयागराज","फतेहपुर"],["प्रयागराज","कौशाम्बी"],["प्रयागराज","प्रतापगढ़"],["सहारनपुर","मुजफ्फरनगर"],["सहारनपुर","सहारनपुर"],["सहारनपुर","शामली"],["वाराणसी","चन्दौली"],["वाराणसी","गाजीपुर"],["वाराणसी","जौनपुर"],["वाराणसी","वाराणसी"],["नई दिल्ली","नई दिल्ली"]];
+const DIVISIONS = [...new Set(MANDAL_JILA.map(x=>x[0]))];
+const DISTRICTS = [...new Set(MANDAL_JILA.map(x=>x[1]))];
+const DISTRICT_TO_DIVISION = Object.fromEntries(MANDAL_JILA.map(([m,j])=>[j,m]));
+const CATEGORIES = ['General','OBC','SC','ST','EWS','Minority'];
+const GENDERS = ['Male','Female','Other'];
+const STATUSES = ['Working','Retired','Deceased','Promoted','Suspended','Voluntary Retirement'];
+
+/* ---------- MENU ---------- */
+const MENU = [
+  {section:'Main'},
+  {key:'dashboard',label:'Dashboard',hi:'डैशबोर्ड',icon:'bi-speedometer2'},
+  {section:'HR Records'},
+  {key:'employees',label:'Employees',hi:'कर्मचारी',icon:'bi-people'},
+  {key:'postings',label:'Postings',hi:'पदस्थापन',icon:'bi-arrow-left-right'},
+  {key:'offices',label:'Offices',hi:'कार्यालय',icon:'bi-building'},
+  {key:'additionalCharges',label:'Additional Charges',hi:'अतिरिक्त प्रभार',icon:'bi-bookmark-plus'},
+  {key:'attachments',label:'Attachments',hi:'सम्बद्ध',icon:'bi-link-45deg'},
+  {key:'promotionForgo',label:'Promotion Forgo',hi:'पदोन्नति त्याग',icon:'bi-x-octagon'},
+  {key:'retirements',label:'Retirements',hi:'सेवानिवृत्ति',icon:'bi-calendar-event'},
+  {key:'deceased',label:'Death Register',hi:'मृत्यु रजिस्टर',icon:'bi-file-earmark-medical'},
+  {section:'Reports'},
+  {key:'reports',label:'Predefined Reports',hi:'पूर्व निर्धारित रिपोर्ट',icon:'bi-file-bar-graph'},
+  {key:'customReports',label:'Custom Reports',hi:'कस्टम रिपोर्ट',icon:'bi-funnel'},
+  {section:'Administration'},
+  {key:'users',label:'Users',hi:'उपयोगकर्ता',icon:'bi-shield-lock',adminOnly:true},
+  {key:'auditLogs',label:'Audit Logs',hi:'ऑडिट लॉग',icon:'bi-clipboard-check',adminOnly:true},
+  {key:'settings',label:'Settings',hi:'सेटिंग्स',icon:'bi-gear'}
+];
+
+/* ---------- HELPERS ---------- */
+const $ = (s,p=document)=>p.querySelector(s);
+const $$ = (s,p=document)=>[...p.querySelectorAll(s)];
+const fmt = (d)=>{ if(!d) return ''; const x = typeof d==='string'?new Date(d):d; if(isNaN(x))return ''; return x.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}); };
+const fmtISO = (d)=>{ if(!d) return ''; const x = typeof d==='string'?new Date(d):d; if(isNaN(x))return ''; return x.toISOString().slice(0,10); };
+const today = ()=> new Date();
+const showLoader = ()=> $('#loader').classList.add('active');
+const hideLoader = ()=> $('#loader').classList.remove('active');
+const esc = (s)=> String(s==null?'':s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+function toast(msg,type='info'){
+  const c = $('#toast-container');
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.innerHTML = `<i class="bi ${ {ok:'bi-check-circle-fill',err:'bi-x-circle-fill',warn:'bi-exclamation-triangle-fill',info:'bi-info-circle-fill'}[type] }" style="color:var(--${ {ok:'ok',err:'bad',warn:'warn',info:'info'}[type] })"></i><div>${esc(msg)}</div>`;
+  c.appendChild(el);
+  setTimeout(()=>{ el.style.opacity='0'; el.style.transition='opacity .3s'; setTimeout(()=>el.remove(),300); }, 3500);
+}
+function confirmDialog(title,message){
+  return new Promise(res=>{
+    $('#cm-title').textContent = title; $('#cm-message').textContent = message;
+    const m = bootstrap.Modal.getOrCreateInstance($('#confirm-modal'));
+    const btn = $('#cm-confirm');
+    const h = ()=>{ btn.removeEventListener('click',h); m.hide(); res(true); };
+    btn.addEventListener('click',h);
+    $('#confirm-modal').addEventListener('hidden.bs.modal',()=>res(false),{once:true});
+    m.show();
+  });
+}
+
+/* ---------- RETIREMENT DATE CALC ---------- */
+function calcRetirement(dob){
+  if(!dob) return null;
+  const d = typeof dob === 'string' ? new Date(dob) : dob;
+  if(isNaN(d)) return null;
+  const day = d.getDate();
+  if(day === 1){
+    // Last day of previous month after completing 60 years
+    const ret = new Date(d.getFullYear()+60, d.getMonth(), 0);
+    return ret;
+  } else {
+    // Last day of same month after completing 60 years
+    const ret = new Date(d.getFullYear()+60, d.getMonth()+1, 0);
+    return ret;
+  }
+}
+
+/* ---------- AUDIT LOG ---------- */
+async function audit(action, module, recordId, oldData, newData){
+  try{
+    await db.collection('auditLogs').add({
+      user: STATE.profile?.email || 'system',
+      userName: STATE.profile?.name || 'System',
+      role: STATE.role || 'system',
+      action, module, recordId: recordId || null,
+      oldData: oldData||null, newData: newData||null,
+      timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  }catch(e){ console.warn('audit fail',e); }
+}
+
+/* ---------- AUTH ---------- */
+async function ensureSuperAdmin(){
+  // Try to sign in as super admin to seed; if not exists, create
+  const seedEmail = 'admin@iaad.gov.in';
+  const seedPwd = 'Admin@12345';
+  try{
+    const snap = await db.collection('users').where('role','==','super_admin').limit(1).get();
+    if(snap.empty){
+      try{
+        const cred = await auth.createUserWithEmailAndPassword(seedEmail, seedPwd);
+        await db.collection('users').doc(cred.user.uid).set({
+          email: seedEmail, name: 'Super Admin', role: 'super_admin',
+          active: true, createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        await auth.signOut();
+      }catch(e){
+        if(e.code === 'auth/email-already-in-use'){
+          // create users doc via login attempt later
+          console.log('Super admin auth exists but no user doc');
+        } else { console.warn('seed err',e); }
+      }
+    }
+  }catch(e){ console.warn(e); }
+}
+
+async function handleLogin(email,pwd){
+  showLoader();
+  try{
+    let cred;
+    try{
+      cred = await auth.signInWithEmailAndPassword(email,pwd);
+    }catch(signInErr){
+      // Bootstrap: if this is the default super admin email, try to create the account
+      const isSeedEmail = email.toLowerCase() === 'admin@iaad.gov.in';
+      const allowCreate = isSeedEmail || (signInErr.code==='auth/user-not-found');
+      if(allowCreate && (signInErr.code==='auth/user-not-found' || signInErr.code==='auth/invalid-credential' || signInErr.code==='auth/wrong-password')){
+        try{
+          cred = await auth.createUserWithEmailAndPassword(email,pwd);
+        }catch(createErr){
+          if(createErr.code==='auth/email-already-in-use') throw signInErr;
+          throw createErr;
+        }
+      } else { throw signInErr; }
+    }
+    let udoc = await db.collection('users').doc(cred.user.uid).get();
+    if(!udoc.exists){
+      // bootstrap as super admin if no user docs at all, else default to user
+      let role = 'user';
+      try{
+        const allUsers = await db.collection('users').limit(1).get();
+        if(allUsers.empty) role = 'super_admin';
+      }catch(e){
+        // If we cannot read users due to rules, seed first user as super_admin
+        if(email.toLowerCase() === 'admin@iaad.gov.in') role = 'super_admin';
+      }
+      await db.collection('users').doc(cred.user.uid).set({
+        email: cred.user.email, name: email.split('@')[0], role, active: true,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      udoc = await db.collection('users').doc(cred.user.uid).get();
+    }
+    const profile = udoc.data();
+    if(profile.active === false){
+      await auth.signOut();
+      throw new Error('Your account is deactivated. Contact administrator.');
+    }
+    return profile;
+  } finally { hideLoader(); }
+}
+
+/* ---------- LISTENERS ---------- */
+function attachListeners(){
+  detachListeners();
+  const subs = [
+    ['employees', 'employees', q=>q.orderBy('seniority','asc')],
+    ['postings', 'postings'],
+    ['offices', 'offices'],
+    ['additionalCharges', 'additionalCharges'],
+    ['attachments', 'attachments'],
+    ['promotionForgo', 'promotionForgo'],
+    ['retirements', 'retirements'],
+    ['deceased', 'deceasedEmployees'],
+    ['users', 'users'],
+    ['auditLogs', 'auditLogs', q=>q.orderBy('timestamp','desc').limit(500)]
+  ];
+  subs.forEach(([key,col,mod])=>{
+    let q = db.collection(col);
+    if(mod) try{ q = mod(q); }catch(e){}
+    const u = q.onSnapshot(s=>{
+      STATE.data[key] = s.docs.map(d=>({id:d.id,...d.data()}));
+      onDataChange(key);
+    }, err=> console.warn(key,err));
+    STATE.unsub.push(u);
+  });
+  // settings
+  STATE.unsub.push(db.collection('settings').doc('app').onSnapshot(s=>{
+    STATE.data.settings = s.exists ? s.data() : {};
+  }));
+}
+function detachListeners(){ STATE.unsub.forEach(u=>{try{u();}catch(e){}}); STATE.unsub=[]; }
+
+function onDataChange(key){
+  if(STATE.active==='dashboard') renderDashboard();
+  if(STATE.active===key) renderCurrentPage();
+  if(['employees','postings','offices','deceased','retirements','additionalCharges'].includes(key) && STATE.active==='dashboard') renderDashboard();
+  // recalculate office stats whenever postings/employees/charges change
+  if(['postings','employees','additionalCharges','offices'].includes(key)) computeOfficeStats();
+}
+
+/* ---------- DERIVED: office stats ---------- */
+function computeOfficeStats(){
+  const offices = STATE.data.offices;
+  const postings = STATE.data.postings;
+  const emps = STATE.data.employees;
+  const charges = STATE.data.additionalCharges;
+  const empById = Object.fromEntries(emps.map(e=>[e.id, e]));
+  offices.forEach(o=>{
+    // Filled = active employees with current posting in this office
+    const filled = postings.filter(p=> p.current && p.officeId === o.id && empById[p.employeeId] && empById[p.employeeId].status === 'Working').length;
+    const ac = charges.filter(c=> c.officeId === o.id && c.status==='Active').length;
+    o._filled = filled;
+    o._vacant = Math.max(0, (parseInt(o.sanctioned||0)) - filled);
+    o._additionalCharges = ac;
+  });
+}
+
+/* ---------- DASHBOARD RENDER ---------- */
+function renderDashboard(){
+  const main = $('#main-view');
+  const emps = STATE.data.employees;
+  const offices = STATE.data.offices;
+  const postings = STATE.data.postings;
+  const charges = STATE.data.additionalCharges;
+  const attachments = STATE.data.attachments;
+  computeOfficeStats();
+  const working = emps.filter(e=>e.status==='Working').length;
+  const retired = emps.filter(e=>e.status==='Retired'||e.status==='Voluntary Retirement').length;
+  const dead = emps.filter(e=>e.status==='Deceased').length;
+  const attached = new Set(attachments.filter(a=>a.status==='Active').map(a=>a.employeeId)).size;
+  const sanc = offices.reduce((s,o)=>s+(parseInt(o.sanctioned||0)),0);
+  const filled = offices.reduce((s,o)=>s+(o._filled||0),0);
+  const vac = Math.max(0, sanc-filled);
+  const acActive = charges.filter(c=>c.status==='Active').length;
+
+  const html = `
+    <div class="page-head">
+      <div>
+        <h1>Dashboard <span class="devanagari" style="font-size:18px;color:var(--muted);font-weight:500"> · डैशबोर्ड</span></h1>
+        <div class="sub">Live workforce intelligence for Internal Accounts & Audit Directorate</div>
+      </div>
+      <div class="d-flex gap-2">
+        <button class="btn btn-outline-primary btn-sm" onclick="exportDashboardPDF()" data-testid="export-dashboard-pdf"><i class="bi bi-file-pdf"></i> Export PDF</button>
+        <button class="btn btn-primary btn-sm" onclick="window.print()"><i class="bi bi-printer"></i> Print</button>
+      </div>
+    </div>
+
+    <div class="kpi">
+      ${kpiCard('Total Employees','कुल कर्मचारी',emps.length,'bi-people','brand')}
+      ${kpiCard('Working','कार्यरत',working,'bi-person-check','green')}
+      ${kpiCard('Retired','सेवानिवृत्त',retired,'bi-calendar-event','amber')}
+      ${kpiCard('Deceased','मृत',dead,'bi-file-medical','red')}
+      ${kpiCard('Attached','सम्बद्ध',attached,'bi-link-45deg','blue')}
+      ${kpiCard('Offices','कार्यालय',offices.length,'bi-building','brand')}
+      ${kpiCard('Sanctioned Posts','स्वीकृत पद',sanc,'bi-clipboard-data','blue')}
+      ${kpiCard('Filled Posts','भरे पद',filled,'bi-check-circle','green')}
+      ${kpiCard('Vacant Posts','रिक्त पद',vac,'bi-exclamation-circle','red')}
+      ${kpiCard('Additional Charges','अतिरिक्त प्रभार',acActive,'bi-bookmark-plus','amber')}
+    </div>
+
+    <div class="chart-grid">
+      <div class="chart-card"><h3>District-wise Employees</h3><div class="wrap"><canvas id="ch-district"></canvas></div></div>
+      <div class="chart-card"><h3>Department-wise Sanctioned vs Filled</h3><div class="wrap"><canvas id="ch-dept"></canvas></div></div>
+      <div class="chart-card"><h3>Vacancy Analysis (Top 10 offices)</h3><div class="wrap"><canvas id="ch-vacancy"></canvas></div></div>
+      <div class="chart-card"><h3>Retirement Forecast (next 5 years)</h3><div class="wrap"><canvas id="ch-retire"></canvas></div></div>
+      <div class="chart-card"><h3>Status Distribution</h3><div class="wrap"><canvas id="ch-status"></canvas></div></div>
+      <div class="chart-card"><h3>Division-wise Posting Strength</h3><div class="wrap"><canvas id="ch-division"></canvas></div></div>
+    </div>
+
+    <div class="section-card">
+      <h3 style="font-size:14px;font-weight:600;margin-bottom:12px">Recent Activity</h3>
+      <div id="recent-activity"></div>
+    </div>
+  `;
+  main.innerHTML = html;
+
+  buildDashboardCharts();
+  renderRecentActivity();
+}
+function kpiCard(en,hi,val,icon,col){
+  return `<div class="kpi-card ${col}">
+    <div class="lbl">${en}</div>
+    <div class="val">${val.toLocaleString('en-IN')}</div>
+    <div class="sub devanagari">${hi}</div>
+    <div class="ic"><i class="bi ${icon}"></i></div>
+  </div>`;
+}
+function buildDashboardCharts(){
+  Object.values(STATE.charts).forEach(c=>{ try{c.destroy();}catch(e){} });
+  STATE.charts = {};
+  const dark = document.documentElement.dataset.theme === 'dark';
+  const grid = dark ? 'rgba(255,255,255,.06)' : 'rgba(0,0,0,.06)';
+  const txt = dark ? '#e8ecef' : '#1a1a1a';
+  Chart.defaults.color = txt;
+  Chart.defaults.borderColor = grid;
+  Chart.defaults.font.family = "'Sora','Noto Sans Devanagari',sans-serif";
+
+  const emps = STATE.data.employees;
+  const offices = STATE.data.offices;
+  const postings = STATE.data.postings;
+
+  // District-wise
+  const distCount = {};
+  postings.filter(p=>p.current).forEach(p=>{ distCount[p.district]=(distCount[p.district]||0)+1; });
+  const distLab = Object.keys(distCount).sort((a,b)=>distCount[b]-distCount[a]).slice(0,12);
+  STATE.charts.district = new Chart($('#ch-district'),{type:'bar',data:{labels:distLab,datasets:[{label:'Postings',data:distLab.map(d=>distCount[d]),backgroundColor:'#10663f',borderRadius:6}]},options:chartOpts()});
+
+  // Department-wise
+  const dept = {};
+  offices.forEach(o=>{ const d=o.department||'Other'; dept[d]=dept[d]||{s:0,f:0}; dept[d].s+=parseInt(o.sanctioned||0); dept[d].f+=(o._filled||0); });
+  const dl = Object.keys(dept).sort((a,b)=>dept[b].s-dept[a].s).slice(0,8);
+  STATE.charts.dept = new Chart($('#ch-dept'),{type:'bar',data:{labels:dl.map(x=>x.length>28?x.slice(0,28)+'…':x),datasets:[
+    {label:'Sanctioned',data:dl.map(x=>dept[x].s),backgroundColor:'#b8862a'},
+    {label:'Filled',data:dl.map(x=>dept[x].f),backgroundColor:'#10663f'}
+  ]},options:chartOpts()});
+
+  // Vacancy top10
+  computeOfficeStats();
+  const sorted = [...offices].sort((a,b)=>(b._vacant||0)-(a._vacant||0)).slice(0,10);
+  STATE.charts.vac = new Chart($('#ch-vacancy'),{type:'bar',data:{labels:sorted.map(o=>(o.name||'').slice(0,30)),datasets:[
+    {label:'Vacant',data:sorted.map(o=>o._vacant||0),backgroundColor:'#b3261e'},
+    {label:'Filled',data:sorted.map(o=>o._filled||0),backgroundColor:'#1f8a4e'}
+  ]},options:{...chartOpts(),indexAxis:'y'}});
+
+  // Retirement forecast
+  const forecast = Array.from({length:5},(_,i)=>today().getFullYear()+i);
+  const fcCount = forecast.map(y=>emps.filter(e=>{ if(e.status!=='Working') return false; const r = e.retirementDate?new Date(e.retirementDate):calcRetirement(e.dob); return r && r.getFullYear()===y;}).length);
+  STATE.charts.retire = new Chart($('#ch-retire'),{type:'line',data:{labels:forecast,datasets:[{label:'Retirements',data:fcCount,borderColor:'#c98a16',backgroundColor:'rgba(201,138,22,.15)',fill:true,tension:.35,pointRadius:4,pointBackgroundColor:'#c98a16'}]},options:chartOpts()});
+
+  // Status pie
+  const statusCount = {};
+  emps.forEach(e=>{ statusCount[e.status||'Unknown']=(statusCount[e.status||'Unknown']||0)+1;});
+  STATE.charts.status = new Chart($('#ch-status'),{type:'doughnut',data:{labels:Object.keys(statusCount),datasets:[{data:Object.values(statusCount),backgroundColor:['#1f8a4e','#c98a16','#b3261e','#1a6fb0','#7f56d9','#5a6470']}]},options:{...chartOpts(),cutout:'62%'}});
+
+  // Division
+  const divCount = {};
+  postings.filter(p=>p.current).forEach(p=>{ divCount[p.division]=(divCount[p.division]||0)+1; });
+  const dvl = Object.keys(divCount);
+  STATE.charts.div = new Chart($('#ch-division'),{type:'bar',data:{labels:dvl,datasets:[{label:'Strength',data:dvl.map(d=>divCount[d]),backgroundColor:'#1a6fb0',borderRadius:6}]},options:chartOpts()});
+}
+function chartOpts(){
+  return {responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{boxWidth:12,padding:12}}},scales:{x:{ticks:{maxRotation:35,minRotation:0}},y:{beginAtZero:true,ticks:{precision:0}}}};
+}
+function renderRecentActivity(){
+  const logs = STATE.data.auditLogs.slice(0,10);
+  if(!logs.length){ $('#recent-activity').innerHTML='<div class="empty"><i class="bi bi-inbox"></i><div>No recent activity</div></div>'; return; }
+  $('#recent-activity').innerHTML = `<div class="table-responsive"><table class="table table-sm">
+    <thead><tr><th>When</th><th>User</th><th>Action</th><th>Module</th><th>Record</th></tr></thead>
+    <tbody>${logs.map(l=>`<tr>
+      <td style="font-size:12px;color:var(--muted)">${l.timestamp?.toDate?fmt(l.timestamp.toDate())+' '+l.timestamp.toDate().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}):''}</td>
+      <td>${esc(l.userName||l.user)}</td>
+      <td><span class="badge-pill b-active">${esc(l.action)}</span></td>
+      <td>${esc(l.module)}</td>
+      <td style="font-size:11px;color:var(--muted)">${esc(l.recordId||'')}</td>
+    </tr>`).join('')}</tbody></table></div>`;
+}
+
+/* ---------- GENERIC PAGE RENDER ---------- */
+function renderCurrentPage(){
+  const k = STATE.active;
+  const map = {
+    dashboard: renderDashboard,
+    employees: ()=>renderListPage('employees'),
+    postings: ()=>renderListPage('postings'),
+    offices: ()=>renderListPage('offices'),
+    additionalCharges: ()=>renderListPage('additionalCharges'),
+    attachments: ()=>renderListPage('attachments'),
+    promotionForgo: ()=>renderListPage('promotionForgo'),
+    retirements: ()=>renderListPage('retirements'),
+    deceased: ()=>renderListPage('deceased'),
+    reports: renderReports,
+    customReports: renderCustomReports,
+    users: renderUsers,
+    auditLogs: renderAuditLogs,
+    settings: renderSettings
+  };
+  (map[k]||renderDashboard)();
+}
+
+/* ---------- MODULE CONFIGS ---------- */
+const MODULES = {
+  employees: {
+    title:'Employees', hi:'कर्मचारी', collection:'employees',
+    columns:[
+      {key:'photoURL',label:'Photo',render:v=>v?`<img src="${esc(v)}" class="photo-thumb">`:`<div class="photo-thumb" style="background:var(--brand);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600">N/A</div>`,orderable:false,export:false},
+      {key:'manavSampadaId',label:'Manav Sampada ID',hi:'मानव सम्पदा आई0डी0'},
+      {key:'name',label:'Name',hi:'नाम'},
+      {key:'fatherName',label:'Father Name',hi:'पिता का नाम'},
+      {key:'dob',label:'DOB',render:fmt,type:'date'},
+      {key:'retirementDate',label:'Retirement',render:fmt,type:'date'},
+      {key:'homeDistrict',label:'Home District',hi:'गृह जनपद'},
+      {key:'category',label:'Category'},
+      {key:'mobile',label:'Mobile'},
+      {key:'seniority',label:'Seniority'},
+      {key:'status',label:'Status',render:v=>`<span class="badge-pill b-${(v||'').toLowerCase().replace(/\s/g,'')}">${esc(v||'')}</span>`}
+    ],
+    form:[
+      {key:'manavSampadaId',label:'Manav Sampada ID',hi:'मानव सम्पदा आई0डी0',req:true},
+      {key:'name',label:'Employee Name',hi:'कर्मचारी का नाम',req:true},
+      {key:'fatherName',label:'Father Name',hi:'पिता का नाम'},
+      {key:'gender',label:'Gender',type:'select',opts:GENDERS},
+      {key:'category',label:'Category',type:'select',opts:CATEGORIES},
+      {key:'mobile',label:'Mobile Number',type:'tel'},
+      {key:'dob',label:'Date of Birth',type:'date',req:true,onChange:'autoRetirement'},
+      {key:'dateOfJoining',label:'Date of Joining',type:'date'},
+      {key:'retirementDate',label:'Retirement Date (auto)',type:'date',readonly:true},
+      {key:'homeDistrict',label:'Home District',type:'select',opts:DISTRICTS},
+      {key:'currentDistrict',label:'Current District',type:'select',opts:DISTRICTS},
+      {key:'seniority',label:'Seniority Number',type:'number'},
+      {key:'status',label:'Status',type:'select',opts:STATUSES,default:'Working'},
+      {key:'remarks',label:'Remarks',type:'textarea',full:true},
+      {key:'photoURL',label:'Photo',type:'file',full:true}
+    ]
+  },
+  postings: {
+    title:'Postings', hi:'पदस्थापन', collection:'postings',
+    columns:[
+      {key:'employeeName',label:'Employee'},
+      {key:'manavSampadaId',label:'Manav ID'},
+      {key:'division',label:'Division'},
+      {key:'district',label:'District'},
+      {key:'officeName',label:'Office'},
+      {key:'orderNumber',label:'Order No.'},
+      {key:'postingDate',label:'Posting Date',render:fmt},
+      {key:'joiningDate',label:'Joining',render:fmt},
+      {key:'relievingDate',label:'Relieving',render:fmt},
+      {key:'current',label:'Current',render:v=>v?'<span class="badge-pill b-working">Active</span>':'<span class="badge-pill b-inactive">Closed</span>'}
+    ],
+    form:[
+      {key:'employeeId',label:'Employee',type:'employee',req:true},
+      {key:'division',label:'Division',type:'select',opts:DIVISIONS,req:true,onChange:'filterDistrictsByDivision'},
+      {key:'district',label:'District',type:'select',opts:DISTRICTS,req:true,onChange:'filterOfficesByDistrict'},
+      {key:'department',label:'Department'},
+      {key:'officeId',label:'Office',type:'office',req:true},
+      {key:'orderNumber',label:'Posting Order Number'},
+      {key:'postingDate',label:'Posting Date',type:'date'},
+      {key:'joiningDate',label:'Joining Date',type:'date',req:true},
+      {key:'relievingDate',label:'Relieving Date',type:'date'},
+      {key:'current',label:'Current Posting',type:'checkbox',default:true},
+      {key:'remarks',label:'Remarks',type:'textarea',full:true}
+    ]
+  },
+  offices: {
+    title:'Offices', hi:'कार्यालय', collection:'offices',
+    columns:[
+      {key:'name',label:'Office Name'},
+      {key:'department',label:'Department'},
+      {key:'district',label:'District'},
+      {key:'division',label:'Division'},
+      {key:'sanctioned',label:'Sanctioned',type:'number'},
+      {key:'_filled',label:'Filled (auto)',render:v=>esc(v||0)},
+      {key:'_vacant',label:'Vacant (auto)',render:v=>`<span style="font-weight:600;color:${v>0?'var(--bad)':'var(--ok)'}">${esc(v||0)}</span>`},
+      {key:'_additionalCharges',label:'Add. Charges',render:v=>esc(v||0)}
+    ],
+    form:[
+      {key:'name',label:'Office Name',hi:'कार्यालय का नाम',req:true,full:true},
+      {key:'department',label:'Department',hi:'विभाग का नाम',req:true,full:true},
+      {key:'district',label:'District',type:'select',opts:DISTRICTS,req:true,onChange:'syncDivision'},
+      {key:'division',label:'Division',type:'select',opts:DIVISIONS,req:true},
+      {key:'sanctioned',label:'Sanctioned Posts',type:'number',req:true},
+      {key:'demand',label:'Office Demand',hi:'कार्यालय की मांग',type:'textarea'},
+      {key:'remarks',label:'Remarks',type:'textarea',full:true}
+    ]
+  },
+  additionalCharges: {
+    title:'Additional Charges', hi:'अतिरिक्त प्रभार', collection:'additionalCharges',
+    columns:[
+      {key:'employeeName',label:'Employee'},
+      {key:'manavSampadaId',label:'Manav ID'},
+      {key:'district',label:'District'},
+      {key:'officeName',label:'Additional Office'},
+      {key:'orderNumber',label:'Order No.'},
+      {key:'effectiveDate',label:'Effective',render:fmt},
+      {key:'cancellationDate',label:'Cancelled',render:fmt},
+      {key:'status',label:'Status',render:v=>`<span class="badge-pill ${v==='Active'?'b-working':'b-inactive'}">${esc(v||'')}</span>`}
+    ],
+    form:[
+      {key:'employeeId',label:'Employee',type:'employee',req:true},
+      {key:'district',label:'Additional Charge District',type:'select',opts:DISTRICTS,req:true,onChange:'filterOfficesByDistrict'},
+      {key:'officeId',label:'Additional Charge Office',type:'office',req:true},
+      {key:'orderNumber',label:'Order Number & Date',req:true},
+      {key:'orderDate',label:'Order Date',type:'date'},
+      {key:'effectiveDate',label:'Effective Date',type:'date',req:true},
+      {key:'cancellationDate',label:'Cancellation Date',type:'date'},
+      {key:'status',label:'Status',type:'select',opts:['Active','Cancelled'],default:'Active'},
+      {key:'remarks',label:'Remarks',type:'textarea',full:true}
+    ]
+  },
+  attachments: {
+    title:'Attachments (Sambaddh)', hi:'सम्बद्ध', collection:'attachments',
+    columns:[
+      {key:'employeeName',label:'Employee'},
+      {key:'manavSampadaId',label:'Manav ID'},
+      {key:'parentOfficeName',label:'Parent Office'},
+      {key:'attachedOfficeName',label:'Attached Office'},
+      {key:'orderNumber',label:'Order No.'},
+      {key:'effectiveDate',label:'Effective',render:fmt},
+      {key:'endDate',label:'End',render:fmt},
+      {key:'status',label:'Status',render:v=>`<span class="badge-pill ${v==='Active'?'b-working':'b-inactive'}">${esc(v||'')}</span>`}
+    ],
+    form:[
+      {key:'employeeId',label:'Employee',type:'employee',req:true},
+      {key:'parentOfficeId',label:'Parent Office',type:'office',req:true},
+      {key:'attachedDistrict',label:'Attached District',type:'select',opts:DISTRICTS,onChange:'filterOfficesByDistrict:attachedOfficeId'},
+      {key:'attachedOfficeId',label:'Attached Office',type:'office',req:true},
+      {key:'orderNumber',label:'Order Number',req:true},
+      {key:'orderDate',label:'Order Date',type:'date'},
+      {key:'effectiveDate',label:'Effective Date',type:'date',req:true},
+      {key:'endDate',label:'End Date',type:'date'},
+      {key:'status',label:'Status',type:'select',opts:['Active','Ended'],default:'Active'},
+      {key:'remarks',label:'Remarks',type:'textarea',full:true}
+    ]
+  },
+  promotionForgo: {
+    title:'Promotion Forgo', hi:'पदोन्नति त्याग', collection:'promotionForgo',
+    columns:[
+      {key:'employeeName',label:'Employee'},
+      {key:'manavSampadaId',label:'Manav ID'},
+      {key:'orderNumber',label:'Order No.'},
+      {key:'orderDate',label:'Order Date',render:fmt},
+      {key:'effectiveDate',label:'Effective',render:fmt},
+      {key:'reason',label:'Reason'}
+    ],
+    form:[
+      {key:'employeeId',label:'Employee',type:'employee',req:true},
+      {key:'orderNumber',label:'Order Number',req:true},
+      {key:'orderDate',label:'Order Date',type:'date',req:true},
+      {key:'effectiveDate',label:'Effective Date',type:'date'},
+      {key:'reason',label:'Reason',type:'textarea'},
+      {key:'remarks',label:'Remarks',type:'textarea',full:true}
+    ]
+  },
+  retirements: {
+    title:'Retirements', hi:'सेवानिवृत्ति', collection:'retirements',
+    columns:[
+      {key:'employeeName',label:'Employee'},
+      {key:'manavSampadaId',label:'Manav ID'},
+      {key:'retirementDate',label:'Retirement Date',render:fmt},
+      {key:'orderNumber',label:'Order No.'},
+      {key:'orderDate',label:'Order Date',render:fmt},
+      {key:'type',label:'Type'}
+    ],
+    form:[
+      {key:'employeeId',label:'Employee',type:'employee',req:true},
+      {key:'retirementDate',label:'Retirement Date',type:'date',req:true},
+      {key:'orderNumber',label:'Retirement Order Number',req:true},
+      {key:'orderDate',label:'Retirement Order Date',type:'date'},
+      {key:'type',label:'Type',type:'select',opts:['Superannuation','Voluntary Retirement'],default:'Superannuation'},
+      {key:'remarks',label:'Remarks',type:'textarea',full:true}
+    ]
+  },
+  deceased: {
+    title:'Death Register', hi:'मृत्यु रजिस्टर', collection:'deceasedEmployees',
+    columns:[
+      {key:'employeeName',label:'Employee'},
+      {key:'manavSampadaId',label:'Manav ID'},
+      {key:'deathDate',label:'Death Date',render:fmt},
+      {key:'orderNumber',label:'Order No.'},
+      {key:'orderDate',label:'Order Date',render:fmt}
+    ],
+    form:[
+      {key:'employeeId',label:'Employee',type:'employee',req:true},
+      {key:'deathDate',label:'Death Date',type:'date',req:true},
+      {key:'orderNumber',label:'Death Order Number'},
+      {key:'orderDate',label:'Death Order Date',type:'date'},
+      {key:'remarks',label:'Remarks',type:'textarea',full:true}
+    ]
+  }
+};
+
+/* ---------- LIST PAGE ---------- */
+function renderListPage(modKey){
+  const mod = MODULES[modKey];
+  const main = $('#main-view');
+  const isAdmin = STATE.role === 'super_admin';
+  const allowAdd = isAdmin || STATE.role === 'user';
+  main.innerHTML = `
+    <div class="page-head">
+      <div>
+        <h1>${mod.title} <span class="devanagari" style="font-size:18px;color:var(--muted);font-weight:500"> · ${mod.hi}</span></h1>
+        <div class="sub">${STATE.data[modKey].length} record(s) · Live updates from Firestore</div>
+      </div>
+      <div class="d-flex gap-2 flex-wrap">
+        ${allowAdd?`<button class="btn btn-primary" onclick="openForm('${modKey}')" data-testid="add-${modKey}-btn"><i class="bi bi-plus-lg"></i> Add</button>`:''}
+        ${allowAdd?`<button class="btn btn-outline-primary" onclick="openBulkImport('${modKey}')" data-testid="bulk-import-${modKey}"><i class="bi bi-upload"></i> Bulk Import</button>`:''}
+        <button class="btn btn-outline-primary" onclick="exportModule('${modKey}','xlsx')"><i class="bi bi-file-earmark-excel"></i> Excel</button>
+        <button class="btn btn-outline-primary" onclick="exportModule('${modKey}','pdf')"><i class="bi bi-file-pdf"></i> PDF</button>
+      </div>
+    </div>
+    <div class="section-card">
+      <div class="table-responsive">
+        <table id="dt-${modKey}" class="table table-hover" style="width:100%">
+          <thead><tr>${mod.columns.map(c=>`<th>${c.label}</th>`).join('')}<th>Actions</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  `;
+  renderTable(modKey);
+}
+function renderTable(modKey){
+  const mod = MODULES[modKey];
+  const tbl = `#dt-${modKey}`;
+  if($.fn.DataTable && $.fn.dataTable.isDataTable(tbl)){ $(tbl).DataTable().destroy(); }
+  const data = enrichRows(modKey, STATE.data[modKey]);
+  if(modKey==='offices') computeOfficeStats();
+  const isAdmin = STATE.role === 'super_admin';
+  $(`${tbl} tbody`).html(data.map(row=>`<tr>${mod.columns.map(c=>{
+    let v = row[c.key];
+    if(c.render) v = c.render(v);
+    else v = esc(v==null?'':v);
+    return `<td>${v}</td>`;
+  }).join('')}<td class="text-nowrap">
+    <button class="btn btn-sm btn-outline-secondary" onclick="viewRecord('${modKey}','${row.id}')" title="View" data-testid="view-${row.id}"><i class="bi bi-eye"></i></button>
+    <button class="btn btn-sm btn-outline-primary" onclick="openForm('${modKey}','${row.id}')" title="Edit" data-testid="edit-${row.id}"><i class="bi bi-pencil"></i></button>
+    ${isAdmin?`<button class="btn btn-sm btn-outline-danger" onclick="deleteRecord('${modKey}','${row.id}')" title="Delete" data-testid="delete-${row.id}"><i class="bi bi-trash"></i></button>`:''}
+  </td></tr>`).join(''));
+  $(tbl).DataTable({
+    pageLength:25,
+    lengthMenu:[10,25,50,100,200],
+    order: [],
+    language:{search:'',searchPlaceholder:'Search...'},
+    dom:'<"row mb-2"<"col-sm-6"l><"col-sm-6 text-end"f>>rtip'
+  });
+}
+function enrichRows(modKey, rows){
+  const empMap = Object.fromEntries(STATE.data.employees.map(e=>[e.id,e]));
+  const offMap = Object.fromEntries(STATE.data.offices.map(o=>[o.id,o]));
+  return rows.map(r=>{
+    const o = {...r};
+    if(r.employeeId && empMap[r.employeeId]){
+      o.employeeName = empMap[r.employeeId].name;
+      o.manavSampadaId = empMap[r.employeeId].manavSampadaId;
+    }
+    if(r.officeId && offMap[r.officeId]) o.officeName = offMap[r.officeId].name;
+    if(r.parentOfficeId && offMap[r.parentOfficeId]) o.parentOfficeName = offMap[r.parentOfficeId].name;
+    if(r.attachedOfficeId && offMap[r.attachedOfficeId]) o.attachedOfficeName = offMap[r.attachedOfficeId].name;
+    return o;
+  });
+}
+
+/* ---------- FORM (Add/Edit) ---------- */
+let currentEdit = {modKey:null, id:null};
+function openForm(modKey, id=null){
+  const mod = MODULES[modKey];
+  if(!mod) return;
+  currentEdit = {modKey, id};
+  const existing = id ? STATE.data[modKey].find(x=>x.id===id) : {};
+  $('#um-title').textContent = (id?'Edit ':'Add ')+mod.title;
+  $('#um-body').innerHTML = `<form id="record-form" class="row g-3">
+    ${mod.form.map(f=>renderFormField(f, existing)).join('')}
+  </form>`;
+  $('#um-footer').innerHTML = `
+    <button class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+    <button class="btn btn-primary" id="save-record-btn" data-testid="save-record-btn"><i class="bi bi-check-lg"></i> Save</button>
+  `;
+  $('#save-record-btn').onclick = ()=> saveRecord();
+  bootstrap.Modal.getOrCreateInstance($('#universal-modal')).show();
+  // wire onChange
+  mod.form.forEach(f=>{
+    if(f.onChange){
+      const el = $(`[name="${f.key}"]`);
+      if(el) el.addEventListener('change', ()=>handleFieldChange(f.onChange,f.key));
+    }
+  });
+}
+function renderFormField(f, existing){
+  const val = existing[f.key] ?? f.default ?? '';
+  const col = f.full ? 'col-12' : 'col-md-6';
+  const ro = f.readonly ? 'readonly' : '';
+  const req = f.req ? 'required' : '';
+  const lab = `<label class="form-label">${f.label}${f.hi?` <span class="devanagari" style="color:var(--muted);font-size:11px"> · ${f.hi}</span>`:''}${f.req?' <span class="text-danger">*</span>':''}</label>`;
+  if(f.type==='select'){
+    return `<div class="${col}">${lab}<select class="form-select" name="${f.key}" ${req}><option value="">— Select —</option>${f.opts.map(o=>`<option value="${esc(o)}" ${o===val?'selected':''}>${esc(o)}</option>`).join('')}</select></div>`;
+  }
+  if(f.type==='employee'){
+    const opts = STATE.data.employees.map(e=>`<option value="${esc(e.id)}" ${e.id===val?'selected':''}>${esc(e.name)} (${esc(e.manavSampadaId||'')})</option>`).join('');
+    return `<div class="${col}">${lab}<select class="form-select" name="${f.key}" ${req}><option value="">— Select Employee —</option>${opts}</select></div>`;
+  }
+  if(f.type==='office'){
+    const opts = STATE.data.offices.map(o=>`<option value="${esc(o.id)}" data-district="${esc(o.district)}" ${o.id===val?'selected':''}>${esc(o.name)} — ${esc(o.district||'')}</option>`).join('');
+    return `<div class="${col}">${lab}<select class="form-select" name="${f.key}" ${req}><option value="">— Select Office —</option>${opts}</select></div>`;
+  }
+  if(f.type==='textarea'){
+    return `<div class="${col}">${lab}<textarea class="form-control" name="${f.key}" rows="2" ${ro}>${esc(val||'')}</textarea></div>`;
+  }
+  if(f.type==='checkbox'){
+    return `<div class="${col}"><div class="form-check mt-4 pt-2"><input class="form-check-input" type="checkbox" name="${f.key}" ${val?'checked':''}><label class="form-check-label">${f.label}</label></div></div>`;
+  }
+  if(f.type==='file'){
+    const cur = val ? `<div class="mt-2"><img src="${esc(val)}" class="photo-thumb"></div>` : '';
+    return `<div class="${col}">${lab}<input class="form-control" type="file" name="${f.key}" accept="image/*">${cur}</div>`;
+  }
+  return `<div class="${col}">${lab}<input class="form-control" type="${f.type||'text'}" name="${f.key}" value="${esc(val||'')}" ${ro} ${req}></div>`;
+}
+function handleFieldChange(action, srcKey){
+  if(action==='autoRetirement'){
+    const dob = $('[name="dob"]').value;
+    if(dob){ const r = calcRetirement(dob); if(r){ const el = $('[name="retirementDate"]'); if(el) el.value = fmtISO(r); } }
+  }
+  if(action==='syncDivision'){
+    const dist = $('[name="district"]').value;
+    if(dist && DISTRICT_TO_DIVISION[dist]){ const dv = $('[name="division"]'); if(dv) dv.value = DISTRICT_TO_DIVISION[dist]; }
+  }
+  if(action==='filterDistrictsByDivision'){
+    const dv = $('[name="division"]').value;
+    const distSel = $('[name="district"]');
+    if(!distSel) return;
+    const cur = distSel.value;
+    const opts = MANDAL_JILA.filter(([m])=>m===dv).map(([,j])=>j);
+    distSel.innerHTML = '<option value="">— Select —</option>'+opts.map(o=>`<option value="${esc(o)}" ${o===cur?'selected':''}>${esc(o)}</option>`).join('');
+  }
+  if(action && action.startsWith('filterOfficesByDistrict')){
+    const targetKey = action.includes(':') ? action.split(':')[1] : 'officeId';
+    const distKey = srcKey;
+    const dist = $(`[name="${distKey}"]`).value;
+    const sel = $(`[name="${targetKey}"]`);
+    if(!sel) return;
+    const cur = sel.value;
+    const list = STATE.data.offices.filter(o=> !dist || o.district === dist);
+    sel.innerHTML = '<option value="">— Select Office —</option>'+list.map(o=>`<option value="${esc(o.id)}" ${o.id===cur?'selected':''}>${esc(o.name)}</option>`).join('');
+  }
+}
+
+async function saveRecord(){
+  const {modKey,id} = currentEdit;
+  const mod = MODULES[modKey];
+  const form = $('#record-form');
+  if(!form.checkValidity()){ form.reportValidity(); return; }
+  const data = {};
+  const fileField = mod.form.find(f=>f.type==='file');
+  for(const f of mod.form){
+    const el = form.querySelector(`[name="${f.key}"]`);
+    if(!el) continue;
+    if(f.type==='checkbox') data[f.key] = el.checked;
+    else if(f.type==='file'){
+      if(el.files && el.files[0]){
+        showLoader();
+        try{
+          const file = el.files[0];
+          const ref = storage.ref().child(`${modKey}/${Date.now()}_${file.name}`);
+          await ref.put(file);
+          data[f.key] = await ref.getDownloadURL();
+        }catch(e){ toast('Upload failed: '+e.message,'err'); }
+        finally{ hideLoader(); }
+      }
+    } else if(f.type==='number') data[f.key] = el.value === '' ? null : Number(el.value);
+    else data[f.key] = el.value || null;
+  }
+  // auto retirement for employees
+  if(modKey==='employees' && data.dob && !data.retirementDate){
+    const r = calcRetirement(data.dob); if(r) data.retirementDate = fmtISO(r);
+  }
+  // for postings, derive office details
+  if(modKey==='postings' && data.officeId){
+    const o = STATE.data.offices.find(x=>x.id===data.officeId);
+    if(o){ data.district = data.district || o.district; data.division = data.division || o.division; data.department = data.department || o.department; }
+  }
+  data.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+  if(!id) data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+  showLoader();
+  try{
+    let recId = id;
+    const old = id ? STATE.data[modKey].find(x=>x.id===id) : null;
+    if(id) await db.collection(mod.collection).doc(id).update(data);
+    else { const ref = await db.collection(mod.collection).add(data); recId = ref.id; }
+    await audit(id?'Update':'Create', modKey, recId, old, data);
+    // Business rules
+    await applyBusinessRules(modKey, recId, data, old);
+    toast('Saved successfully','ok');
+    bootstrap.Modal.getInstance($('#universal-modal')).hide();
+  }catch(e){
+    console.error(e); toast('Save failed: '+e.message,'err');
+  } finally { hideLoader(); }
+}
+
+/* ---------- BUSINESS RULES ENGINE ---------- */
+async function applyBusinessRules(modKey, recId, newData, oldData){
+  const batch = db.batch();
+  let dirty = false;
+  if(modKey==='deceased'){
+    // mark employee Deceased + close postings + cancel active additional charges
+    const empId = newData.employeeId;
+    if(empId){
+      batch.update(db.collection('employees').doc(empId), {status:'Deceased', deathDate: newData.deathDate, updatedAt: firebase.firestore.FieldValue.serverTimestamp()}); dirty=true;
+      const ap = STATE.data.postings.filter(p=>p.employeeId===empId && p.current);
+      ap.forEach(p=>{ batch.update(db.collection('postings').doc(p.id),{current:false, relievingDate:newData.deathDate}); });
+      const ac = STATE.data.additionalCharges.filter(c=>c.employeeId===empId && c.status==='Active');
+      ac.forEach(c=>{ batch.update(db.collection('additionalCharges').doc(c.id),{status:'Cancelled', cancellationDate:newData.deathDate}); });
+    }
+  }
+  if(modKey==='retirements'){
+    const empId = newData.employeeId;
+    if(empId){
+      const st = newData.type==='Voluntary Retirement' ? 'Voluntary Retirement' : 'Retired';
+      batch.update(db.collection('employees').doc(empId), {status:st, retirementActualDate:newData.retirementDate}); dirty=true;
+      const ap = STATE.data.postings.filter(p=>p.employeeId===empId && p.current);
+      ap.forEach(p=>{ batch.update(db.collection('postings').doc(p.id),{current:false, relievingDate:newData.retirementDate}); });
+      const ac = STATE.data.additionalCharges.filter(c=>c.employeeId===empId && c.status==='Active');
+      ac.forEach(c=>{ batch.update(db.collection('additionalCharges').doc(c.id),{status:'Cancelled', cancellationDate:newData.retirementDate}); });
+    }
+  }
+  if(modKey==='postings' && newData.current){
+    // close other postings for same employee
+    const empId = newData.employeeId;
+    if(empId){
+      const others = STATE.data.postings.filter(p=>p.employeeId===empId && p.id!==recId && p.current);
+      others.forEach(p=>{ batch.update(db.collection('postings').doc(p.id),{current:false, relievingDate:newData.joiningDate||fmtISO(new Date())}); dirty=true; });
+    }
+  }
+  if(dirty){ try{ await batch.commit(); }catch(e){ console.warn(e); } }
+}
+
+/* ---------- VIEW RECORD ---------- */
+function viewRecord(modKey,id){
+  const mod = MODULES[modKey];
+  const r = enrichRows(modKey, STATE.data[modKey].filter(x=>x.id===id))[0];
+  if(!r) return;
+  $('#um-title').textContent = mod.title + ' Detail';
+  const rows = mod.form.map(f=>{
+    let v = r[f.key];
+    if(f.type==='date') v = fmt(v);
+    if(f.type==='employee') v = r.employeeName || v;
+    if(f.type==='office') v = r.officeName || v;
+    if(f.type==='checkbox') v = v?'Yes':'No';
+    if(f.type==='file' && v) return `<dt class="col-sm-4">${f.label}</dt><dd class="col-sm-8"><img src="${esc(v)}" class="photo-lg"></dd>`;
+    return `<dt class="col-sm-4">${f.label}</dt><dd class="col-sm-8">${esc(v||'-')}</dd>`;
+  }).join('');
+  $('#um-body').innerHTML = `<dl class="row">${rows}</dl>${renderRelatedHistory(modKey,r)}`;
+  $('#um-footer').innerHTML = `<button class="btn btn-light" data-bs-dismiss="modal">Close</button>`;
+  bootstrap.Modal.getOrCreateInstance($('#universal-modal')).show();
+}
+function renderRelatedHistory(modKey,r){
+  if(modKey!=='employees') return '';
+  const empId = r.id;
+  const postings = enrichRows('postings', STATE.data.postings.filter(p=>p.employeeId===empId));
+  const ac = enrichRows('additionalCharges', STATE.data.additionalCharges.filter(c=>c.employeeId===empId));
+  const at = enrichRows('attachments', STATE.data.attachments.filter(a=>a.employeeId===empId));
+  let html = '<hr><h6 class="mt-3">Posting History</h6>';
+  if(postings.length){
+    html += `<div class="table-responsive"><table class="table table-sm"><thead><tr><th>Office</th><th>District</th><th>Joining</th><th>Relieving</th><th>Status</th></tr></thead><tbody>${postings.map(p=>`<tr><td>${esc(p.officeName||'')}</td><td>${esc(p.district||'')}</td><td>${fmt(p.joiningDate)}</td><td>${fmt(p.relievingDate)}</td><td>${p.current?'<span class="badge-pill b-working">Current</span>':'<span class="badge-pill b-inactive">Closed</span>'}</td></tr>`).join('')}</tbody></table></div>`;
+  } else html += '<div class="text-muted small">No postings recorded.</div>';
+  if(ac.length){
+    html += '<h6 class="mt-3">Additional Charges</h6><div class="table-responsive"><table class="table table-sm"><thead><tr><th>Office</th><th>Order</th><th>Effective</th><th>Cancelled</th><th>Status</th></tr></thead><tbody>'+ac.map(c=>`<tr><td>${esc(c.officeName||'')}</td><td>${esc(c.orderNumber||'')}</td><td>${fmt(c.effectiveDate)}</td><td>${fmt(c.cancellationDate)}</td><td>${esc(c.status||'')}</td></tr>`).join('')+'</tbody></table></div>';
+  }
+  if(at.length){
+    html += '<h6 class="mt-3">Attachments</h6><div class="table-responsive"><table class="table table-sm"><thead><tr><th>Parent</th><th>Attached</th><th>Order</th><th>Effective</th><th>Status</th></tr></thead><tbody>'+at.map(a=>`<tr><td>${esc(a.parentOfficeName||'')}</td><td>${esc(a.attachedOfficeName||'')}</td><td>${esc(a.orderNumber||'')}</td><td>${fmt(a.effectiveDate)}</td><td>${esc(a.status||'')}</td></tr>`).join('')+'</tbody></table></div>';
+  }
+  return html;
+}
+
+/* ---------- DELETE ---------- */
+async function deleteRecord(modKey,id){
+  if(STATE.role!=='super_admin'){ toast('Permission denied','err'); return; }
+  // Integrity
+  const integrity = checkIntegrity(modKey,id);
+  if(integrity){ toast(integrity,'warn'); return; }
+  const ok = await confirmDialog('Delete record','This action cannot be undone. Continue?');
+  if(!ok) return;
+  showLoader();
+  try{
+    const mod = MODULES[modKey];
+    const old = STATE.data[modKey].find(x=>x.id===id);
+    await db.collection(mod.collection).doc(id).delete();
+    await audit('Delete', modKey, id, old, null);
+    toast('Deleted','ok');
+  }catch(e){ toast('Delete failed: '+e.message,'err'); }
+  finally{ hideLoader(); }
+}
+function checkIntegrity(modKey,id){
+  if(modKey==='offices'){
+    const has = STATE.data.postings.some(p=>p.officeId===id && p.current);
+    if(has) return 'Office has active postings. Cannot delete.';
+  }
+  if(modKey==='employees'){
+    const has = STATE.data.postings.some(p=>p.employeeId===id);
+    if(has) return 'Employee has service history. Use status change instead.';
+  }
+  return null;
+}
+
+/* ---------- BULK IMPORT / EXPORT ---------- */
+function openBulkImport(modKey){
+  const mod = MODULES[modKey];
+  $('#um-title').textContent = `Bulk Import — ${mod.title}`;
+  const fields = mod.form.filter(f=>f.type!=='file').map(f=>f.key).join(', ');
+  $('#um-body').innerHTML = `
+    <div class="alert alert-info small">Upload an Excel/CSV file. First row must contain column headers matching these field keys:<br><code>${esc(fields)}</code><br><br>
+    For Office/Employee references, you may provide either the ID or the human name/Manav Sampada ID — the system will auto-resolve.</div>
+    <input type="file" class="form-control" id="bulk-file" accept=".xlsx,.xls,.csv" data-testid="bulk-file-input">
+    <div class="mt-3"><button class="btn btn-outline-primary btn-sm" onclick="downloadTemplate('${modKey}')"><i class="bi bi-download"></i> Download Template</button></div>
+    <div id="bulk-preview" class="mt-3"></div>
+  `;
+  $('#um-footer').innerHTML = `<button class="btn btn-light" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary" id="bulk-go" data-testid="bulk-import-go">Import</button>`;
+  $('#bulk-go').onclick = ()=>doBulkImport(modKey);
+  bootstrap.Modal.getOrCreateInstance($('#universal-modal')).show();
+}
+function downloadTemplate(modKey){
+  const mod = MODULES[modKey];
+  const keys = mod.form.filter(f=>f.type!=='file').map(f=>f.key);
+  const ws = XLSX.utils.aoa_to_sheet([keys]);
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Template');
+  XLSX.writeFile(wb, `${modKey}-template.xlsx`);
+}
+async function doBulkImport(modKey){
+  const file = $('#bulk-file').files[0];
+  if(!file){ toast('Choose a file','warn'); return; }
+  showLoader();
+  try{
+    const ab = await file.arrayBuffer();
+    const wb = XLSX.read(ab); const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws,{defval:null});
+    const mod = MODULES[modKey];
+    let ok=0, fail=0;
+    const empByMid = Object.fromEntries(STATE.data.employees.map(e=>[String(e.manavSampadaId||'').trim(),e.id]));
+    const offByName = Object.fromEntries(STATE.data.offices.map(o=>[String(o.name||'').trim(),o.id]));
+    for(const r of rows){
+      try{
+        const data = {};
+        for(const f of mod.form){
+          let v = r[f.key];
+          if(v==null||v==='') continue;
+          if(f.type==='employee'){
+            v = empByMid[String(v).trim()] || v;
+          }
+          if(f.type==='office'){
+            v = offByName[String(v).trim()] || v;
+          }
+          if(f.type==='date' && typeof v==='number'){ v = fmtISO(new Date(Math.round((v-25569)*86400*1000))); }
+          if(f.type==='number') v = Number(v);
+          if(f.type==='checkbox') v = String(v).toLowerCase()==='true'||v===1;
+          data[f.key]=v;
+        }
+        if(modKey==='employees' && data.dob && !data.retirementDate){ const rd = calcRetirement(data.dob); if(rd) data.retirementDate = fmtISO(rd); }
+        data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+        await db.collection(mod.collection).add(data);
+        ok++;
+      }catch(e){ console.warn(e); fail++; }
+    }
+    await audit('Import', modKey, null, null, {ok,fail,total:rows.length});
+    toast(`Imported ${ok} / ${rows.length} (${fail} failed)`, fail?'warn':'ok');
+    bootstrap.Modal.getInstance($('#universal-modal')).hide();
+  }catch(e){ toast('Import failed: '+e.message,'err'); }
+  finally{ hideLoader(); }
+}
+
+function exportModule(modKey, fmt='xlsx'){
+  const mod = MODULES[modKey];
+  const data = enrichRows(modKey, STATE.data[modKey]);
+  const cols = mod.columns.filter(c=>c.export!==false);
+  const head = cols.map(c=>c.label);
+  const rows = data.map(r=>cols.map(c=>{
+    const v = r[c.key];
+    if(c.type==='date') return v? new Date(v).toLocaleDateString('en-IN'):'';
+    return v==null?'':String(v).replace(/<[^>]+>/g,'');
+  }));
+  if(fmt==='xlsx'){
+    const ws = XLSX.utils.aoa_to_sheet([head,...rows]);
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,mod.title);
+    XLSX.writeFile(wb, `${modKey}-${Date.now()}.xlsx`);
+  } else if(fmt==='csv'){
+    const csv = [head,...rows].map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv],{type:'text/csv'});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `${modKey}.csv`; a.click();
+  } else if(fmt==='pdf'){
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({orientation:'landscape'});
+    doc.setFontSize(14); doc.text(`IAAD HRMS — ${mod.title}`, 14, 14);
+    doc.setFontSize(9); doc.text(`Generated: ${new Date().toLocaleString('en-IN')}`,14,20);
+    doc.autoTable({startY:24, head:[head], body:rows, styles:{fontSize:7}, headStyles:{fillColor:[11,61,46]}});
+    doc.save(`${modKey}-${Date.now()}.pdf`);
+  }
+  audit('Export', modKey, null, null, {format:fmt,count:rows.length});
+}
+
+/* ---------- REPORTS ---------- */
+function renderReports(){
+  const reports = [
+    {key:'employeeList',name:'Employee List',desc:'All employees with current posting'},
+    {key:'districtWise',name:'District-wise Employee Report',desc:'Employees grouped by current district'},
+    {key:'officeWise',name:'Office-wise Employee Report',desc:'Headcount by office with vacancy'},
+    {key:'departmentWise',name:'Department-wise Report',desc:'Sanctioned/Filled/Vacant by department'},
+    {key:'vacancy',name:'Vacancy Report',desc:'All offices with vacant posts'},
+    {key:'retirementUpcoming',name:'Upcoming Retirements',desc:'Employees retiring in next 24 months'},
+    {key:'deathRegister',name:'Death Register Report',desc:'All deceased employees'},
+    {key:'additionalCharge',name:'Additional Charge Report',desc:'Active additional charges'},
+    {key:'attachment',name:'Attachment Report',desc:'Active sambaddh records'},
+    {key:'promotionForgo',name:'Promotion Forgo Report',desc:'All forgo orders'},
+    {key:'postingHistory',name:'Posting History Report',desc:'Complete posting movements'}
+  ];
+  $('#main-view').innerHTML = `
+    <div class="page-head"><div><h1>Predefined Reports</h1><div class="sub">Standard MIS reports for the Accountant Cadre</div></div></div>
+    <div class="row g-3">${reports.map(r=>`<div class="col-md-4"><div class="card h-100"><div class="card-body"><h6 class="mb-1">${r.name}</h6><p class="text-muted small mb-3">${r.desc}</p><button class="btn btn-sm btn-primary" onclick="runReport('${r.key}')" data-testid="run-${r.key}"><i class="bi bi-play"></i> Run</button></div></div></div>`).join('')}</div>
+    <div id="report-output" class="mt-4"></div>
+  `;
+}
+function runReport(key){
+  let data=[], cols=[], title='';
+  computeOfficeStats();
+  const empByDist = (d)=>STATE.data.employees.filter(e=>e.currentDistrict===d);
+  switch(key){
+    case 'employeeList':
+      title='Employee List';
+      cols=['Manav ID','Name','DOB','Retirement','Home District','Current District','Status','Mobile','Seniority'];
+      data=STATE.data.employees.map(e=>[e.manavSampadaId,e.name,fmt(e.dob),fmt(e.retirementDate),e.homeDistrict,e.currentDistrict,e.status,e.mobile,e.seniority]);
+      break;
+    case 'districtWise':
+      title='District-wise Employee Report';
+      cols=['District','Working','Retired','Deceased','Total'];
+      data=DISTRICTS.map(d=>{const list=empByDist(d);return [d,list.filter(e=>e.status==='Working').length,list.filter(e=>e.status==='Retired').length,list.filter(e=>e.status==='Deceased').length,list.length]}).filter(r=>r[4]>0);
+      break;
+    case 'officeWise':
+      title='Office-wise Employee Report';
+      cols=['Office','District','Department','Sanctioned','Filled','Vacant','Add. Charges'];
+      data=STATE.data.offices.map(o=>[o.name,o.district,o.department,o.sanctioned||0,o._filled||0,o._vacant||0,o._additionalCharges||0]);
+      break;
+    case 'departmentWise':
+      title='Department-wise Report';
+      const byDept={};
+      STATE.data.offices.forEach(o=>{const d=o.department||'';byDept[d]=byDept[d]||{s:0,f:0};byDept[d].s+=parseInt(o.sanctioned||0);byDept[d].f+=(o._filled||0)});
+      cols=['Department','Sanctioned','Filled','Vacant'];
+      data=Object.keys(byDept).map(d=>[d,byDept[d].s,byDept[d].f,byDept[d].s-byDept[d].f]);
+      break;
+    case 'vacancy':
+      title='Vacancy Report';
+      cols=['Office','District','Department','Sanctioned','Filled','Vacant'];
+      data=STATE.data.offices.filter(o=>(o._vacant||0)>0).map(o=>[o.name,o.district,o.department,o.sanctioned||0,o._filled||0,o._vacant||0]);
+      break;
+    case 'retirementUpcoming':
+      title='Upcoming Retirements (24 months)';
+      const limit=new Date(); limit.setMonth(limit.getMonth()+24);
+      cols=['Manav ID','Name','DOB','Retirement','District','Status'];
+      data=STATE.data.employees.filter(e=>{const r=e.retirementDate?new Date(e.retirementDate):null;return e.status==='Working'&&r&&r>=today()&&r<=limit;}).sort((a,b)=>new Date(a.retirementDate)-new Date(b.retirementDate)).map(e=>[e.manavSampadaId,e.name,fmt(e.dob),fmt(e.retirementDate),e.currentDistrict,e.status]);
+      break;
+    case 'deathRegister':
+      title='Death Register';
+      const empMap=Object.fromEntries(STATE.data.employees.map(e=>[e.id,e]));
+      cols=['Manav ID','Name','Death Date','Order','Order Date'];
+      data=STATE.data.deceased.map(d=>{const e=empMap[d.employeeId]||{};return [e.manavSampadaId,e.name,fmt(d.deathDate),d.orderNumber,fmt(d.orderDate)]});
+      break;
+    case 'additionalCharge':
+      title='Additional Charge Report';
+      const em=Object.fromEntries(STATE.data.employees.map(e=>[e.id,e]));
+      const om=Object.fromEntries(STATE.data.offices.map(o=>[o.id,o]));
+      cols=['Employee','Manav ID','Office','District','Order','Effective','Status'];
+      data=STATE.data.additionalCharges.map(c=>{const e=em[c.employeeId]||{};const o=om[c.officeId]||{};return [e.name,e.manavSampadaId,o.name,c.district,c.orderNumber,fmt(c.effectiveDate),c.status]});
+      break;
+    case 'attachment':
+      title='Attachment Report';
+      const em2=Object.fromEntries(STATE.data.employees.map(e=>[e.id,e]));
+      const om2=Object.fromEntries(STATE.data.offices.map(o=>[o.id,o]));
+      cols=['Employee','Manav ID','Parent Office','Attached Office','Order','Effective','Status'];
+      data=STATE.data.attachments.map(a=>{const e=em2[a.employeeId]||{};return [e.name,e.manavSampadaId,(om2[a.parentOfficeId]||{}).name,(om2[a.attachedOfficeId]||{}).name,a.orderNumber,fmt(a.effectiveDate),a.status]});
+      break;
+    case 'promotionForgo':
+      title='Promotion Forgo Report';
+      const em3=Object.fromEntries(STATE.data.employees.map(e=>[e.id,e]));
+      cols=['Manav ID','Name','Order','Order Date','Reason'];
+      data=STATE.data.promotionForgo.map(p=>{const e=em3[p.employeeId]||{};return [e.manavSampadaId,e.name,p.orderNumber,fmt(p.orderDate),p.reason]});
+      break;
+    case 'postingHistory':
+      title='Posting History';
+      cols=['Manav ID','Name','Division','District','Office','Order','Joining','Relieving','Current'];
+      const em4=Object.fromEntries(STATE.data.employees.map(e=>[e.id,e]));
+      const om4=Object.fromEntries(STATE.data.offices.map(o=>[o.id,o]));
+      data=STATE.data.postings.map(p=>{const e=em4[p.employeeId]||{};const o=om4[p.officeId]||{};return [e.manavSampadaId,e.name,p.division,p.district,o.name,p.orderNumber,fmt(p.joiningDate),fmt(p.relievingDate),p.current?'Yes':'No']});
+      break;
+  }
+  $('#report-output').innerHTML = `
+    <div class="section-card">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="mb-0">${esc(title)}</h5>
+        <div>
+          <button class="btn btn-sm btn-outline-primary" onclick='downloadCustomReport(${JSON.stringify(cols).replace(/'/g,"\\'")}, ${JSON.stringify(data).replace(/'/g,"\\'")}, "xlsx","${title}")'><i class="bi bi-file-excel"></i> Excel</button>
+          <button class="btn btn-sm btn-outline-primary" onclick='downloadCustomReport(${JSON.stringify(cols).replace(/'/g,"\\'")}, ${JSON.stringify(data).replace(/'/g,"\\'")}, "pdf","${title}")'><i class="bi bi-file-pdf"></i> PDF</button>
+          <button class="btn btn-sm btn-outline-primary" onclick="window.print()"><i class="bi bi-printer"></i> Print</button>
+        </div>
+      </div>
+      <div class="table-responsive"><table id="rpt-table" class="table table-sm table-striped"><thead><tr>${cols.map(c=>`<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${data.map(r=>`<tr>${r.map(c=>`<td>${esc(c==null?'':c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
+      <div class="text-muted small mt-2">${data.length} record(s)</div>
+    </div>`;
+  $('#rpt-table').DataTable({pageLength:25,lengthMenu:[10,25,50,100]});
+}
+function downloadCustomReport(cols,rows,fmt,title){
+  if(fmt==='xlsx'){
+    const ws = XLSX.utils.aoa_to_sheet([cols,...rows]);
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,title.slice(0,30));
+    XLSX.writeFile(wb,`${title}-${Date.now()}.xlsx`);
+  } else {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({orientation:'landscape'});
+    doc.setFontSize(14); doc.text(`IAAD HRMS — ${title}`, 14, 14);
+    doc.setFontSize(9); doc.text(`Generated: ${new Date().toLocaleString('en-IN')}`,14,20);
+    doc.autoTable({startY:24,head:[cols],body:rows,styles:{fontSize:7},headStyles:{fillColor:[11,61,46]}});
+    doc.save(`${title}-${Date.now()}.pdf`);
+  }
+}
+
+/* ---------- CUSTOM REPORT BUILDER ---------- */
+function renderCustomReports(){
+  $('#main-view').innerHTML = `
+    <div class="page-head"><div><h1>Custom Report Builder</h1><div class="sub">Build ad-hoc MIS reports across any module</div></div></div>
+    <div class="section-card">
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label">Module</label>
+          <select id="cr-module" class="form-select">${Object.keys(MODULES).map(k=>`<option value="${k}">${MODULES[k].title}</option>`).join('')}</select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Date Field</label>
+          <select id="cr-date-field" class="form-select"></select>
+        </div>
+        <div class="col-md-2"><label class="form-label">From</label><input type="date" id="cr-from" class="form-control"></div>
+        <div class="col-md-2"><label class="form-label">To</label><input type="date" id="cr-to" class="form-control"></div>
+        <div class="col-12">
+          <label class="form-label">Fields to display</label>
+          <div id="cr-fields" class="d-flex gap-3 flex-wrap"></div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Filter by</label>
+          <div id="cr-filters"></div>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Sort by</label>
+          <select id="cr-sort" class="form-select"></select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Sort direction</label>
+          <select id="cr-dir" class="form-select"><option value="asc">Ascending</option><option value="desc">Descending</option></select>
+        </div>
+        <div class="col-12 d-flex gap-2">
+          <button class="btn btn-primary" onclick="runCustomReport()" data-testid="run-custom-report"><i class="bi bi-play"></i> Generate</button>
+          <button class="btn btn-outline-primary" onclick="saveCustomReport()"><i class="bi bi-bookmark"></i> Save Definition</button>
+        </div>
+      </div>
+    </div>
+    <div id="cr-output"></div>
+  `;
+  $('#cr-module').addEventListener('change', buildCustomReportFields);
+  buildCustomReportFields();
+}
+function buildCustomReportFields(){
+  const mk = $('#cr-module').value;
+  const mod = MODULES[mk];
+  const fields = mod.form;
+  $('#cr-fields').innerHTML = fields.filter(f=>f.type!=='file').map(f=>`<label class="form-check"><input type="checkbox" class="form-check-input cr-field" value="${f.key}" checked> ${esc(f.label)}</label>`).join('');
+  $('#cr-date-field').innerHTML = '<option value="">— None —</option>'+fields.filter(f=>f.type==='date').map(f=>`<option value="${f.key}">${esc(f.label)}</option>`).join('');
+  $('#cr-filters').innerHTML = fields.filter(f=>f.type==='select').slice(0,3).map(f=>`<div class="mb-2"><label class="form-label small">${esc(f.label)}</label><select class="form-select form-select-sm cr-filter" data-field="${f.key}"><option value="">All</option>${f.opts.map(o=>`<option>${esc(o)}</option>`).join('')}</select></div>`).join('');
+  $('#cr-sort').innerHTML = fields.filter(f=>f.type!=='file').map(f=>`<option value="${f.key}">${esc(f.label)}</option>`).join('');
+}
+function runCustomReport(){
+  const mk = $('#cr-module').value;
+  const mod = MODULES[mk];
+  const sel = [...$$('.cr-field')].filter(c=>c.checked).map(c=>c.value);
+  const df = $('#cr-date-field').value;
+  const from = $('#cr-from').value;
+  const to = $('#cr-to').value;
+  const filters = [...$$('.cr-filter')].map(s=>({field:s.dataset.field,val:s.value})).filter(f=>f.val);
+  const sort = $('#cr-sort').value;
+  const dir = $('#cr-dir').value;
+
+  let rows = enrichRows(mk, STATE.data[mk]);
+  if(df && (from||to)){
+    rows = rows.filter(r=>{ const v = r[df]; if(!v) return false; const d=new Date(v); if(from&&d<new Date(from)) return false; if(to&&d>new Date(to)) return false; return true; });
+  }
+  filters.forEach(f=>{ rows = rows.filter(r=>r[f.field]===f.val); });
+  if(sort) rows.sort((a,b)=>{const x=a[sort],y=b[sort];return dir==='asc'?(x>y?1:-1):(x<y?1:-1);});
+
+  const labels = sel.map(s=>mod.form.find(f=>f.key===s)?.label||s);
+  const data = rows.map(r=>sel.map(s=>{const f=mod.form.find(x=>x.key===s);let v=r[s];if(f?.type==='date')v=fmt(v);if(f?.type==='employee')v=r.employeeName||v;if(f?.type==='office')v=r.officeName||v;if(f?.type==='checkbox')v=v?'Yes':'No';return v;}));
+  $('#cr-output').innerHTML = `
+    <div class="section-card">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="mb-0">Custom Report — ${esc(mod.title)}</h5>
+        <div>
+          <button class="btn btn-sm btn-outline-primary" onclick='downloadCustomReport(${JSON.stringify(labels)},${JSON.stringify(data)},"xlsx","custom-${mk}")'><i class="bi bi-file-excel"></i> Excel</button>
+          <button class="btn btn-sm btn-outline-primary" onclick='downloadCustomReport(${JSON.stringify(labels)},${JSON.stringify(data)},"pdf","custom-${mk}")'><i class="bi bi-file-pdf"></i> PDF</button>
+        </div>
+      </div>
+      <div class="table-responsive"><table id="cr-table" class="table table-sm table-striped"><thead><tr>${labels.map(l=>`<th>${esc(l)}</th>`).join('')}</tr></thead><tbody>${data.map(r=>`<tr>${r.map(c=>`<td>${esc(c==null?'':c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
+      <div class="text-muted small mt-2">${rows.length} record(s)</div>
+    </div>`;
+  $('#cr-table').DataTable({pageLength:25});
+}
+async function saveCustomReport(){
+  const name = prompt('Report name?');
+  if(!name) return;
+  const def = {
+    name, module: $('#cr-module').value,
+    fields:[...$$('.cr-field')].filter(c=>c.checked).map(c=>c.value),
+    dateField:$('#cr-date-field').value, from:$('#cr-from').value, to:$('#cr-to').value,
+    filters:[...$$('.cr-filter')].map(s=>({field:s.dataset.field,val:s.value})).filter(f=>f.val),
+    sort:$('#cr-sort').value, dir:$('#cr-dir').value,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: STATE.profile.email
+  };
+  await db.collection('savedReports').add(def);
+  toast('Report saved','ok');
+}
+
+/* ---------- USERS ---------- */
+function renderUsers(){
+  if(STATE.role !== 'super_admin'){ $('#main-view').innerHTML = '<div class="empty"><i class="bi bi-lock"></i><div>Access denied</div></div>'; return; }
+  $('#main-view').innerHTML = `
+    <div class="page-head"><div><h1>Users</h1><div class="sub">${STATE.data.users.length} user(s)</div></div>
+    <button class="btn btn-primary" onclick="openUserForm()" data-testid="add-user-btn"><i class="bi bi-plus-lg"></i> Add User</button></div>
+    <div class="section-card"><div class="table-responsive"><table id="dt-users" class="table table-hover" style="width:100%"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead><tbody>${STATE.data.users.map(u=>`<tr>
+      <td>${esc(u.name||'')}</td>
+      <td>${esc(u.email||'')}</td>
+      <td><span class="badge-pill ${u.role==='super_admin'?'b-promoted':'b-active'}">${esc(u.role||'')}</span></td>
+      <td><span class="badge-pill ${u.active!==false?'b-working':'b-inactive'}">${u.active!==false?'Active':'Inactive'}</span></td>
+      <td>${u.createdAt?.toDate?fmt(u.createdAt.toDate()):''}</td>
+      <td class="text-nowrap">
+        <button class="btn btn-sm btn-outline-primary" onclick="openUserForm('${u.id}')" data-testid="edit-user-${u.id}"><i class="bi bi-pencil"></i></button>
+        <button class="btn btn-sm btn-outline-${u.active!==false?'warning':'success'}" onclick="toggleUser('${u.id}')" title="${u.active!==false?'Deactivate':'Activate'}"><i class="bi ${u.active!==false?'bi-pause':'bi-play'}"></i></button>
+      </td></tr>`).join('')}</tbody></table></div></div>`;
+  $('#dt-users').DataTable({pageLength:25});
+}
+function openUserForm(id=null){
+  const existing = id ? STATE.data.users.find(u=>u.id===id) : {};
+  $('#um-title').textContent = id?'Edit User':'Add User';
+  $('#um-body').innerHTML = `<form id="user-form" class="row g-3">
+    <div class="col-md-6"><label class="form-label">Name *</label><input class="form-control" name="name" value="${esc(existing.name||'')}" required></div>
+    <div class="col-md-6"><label class="form-label">Email *</label><input class="form-control" type="email" name="email" value="${esc(existing.email||'')}" ${id?'readonly':''} required></div>
+    <div class="col-md-6"><label class="form-label">Role *</label><select class="form-select" name="role" required><option value="user" ${existing.role==='user'?'selected':''}>User</option><option value="super_admin" ${existing.role==='super_admin'?'selected':''}>Super Admin</option></select></div>
+    <div class="col-md-6"><label class="form-label">${id?'Reset Password (leave blank to keep)':'Password *'}</label><input class="form-control" type="text" name="password" ${id?'':'required minlength="6"'}></div>
+    <div class="col-md-6"><label class="form-label">Phone</label><input class="form-control" name="phone" value="${esc(existing.phone||'')}"></div>
+    <div class="col-md-6 d-flex align-items-end"><div class="form-check"><input class="form-check-input" type="checkbox" name="active" ${existing.active!==false?'checked':''}><label class="form-check-label">Active</label></div></div>
+  </form>`;
+  $('#um-footer').innerHTML = `<button class="btn btn-light" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary" id="user-save" data-testid="save-user-btn">Save</button>`;
+  $('#user-save').onclick = ()=>saveUser(id);
+  bootstrap.Modal.getOrCreateInstance($('#universal-modal')).show();
+}
+async function saveUser(id){
+  const f = $('#user-form');
+  if(!f.checkValidity()){ f.reportValidity(); return; }
+  const data = Object.fromEntries(new FormData(f));
+  data.active = !!f.active.checked;
+  showLoader();
+  try{
+    if(id){
+      const upd = {name:data.name, role:data.role, phone:data.phone||null, active:data.active};
+      await db.collection('users').doc(id).update(upd);
+      if(data.password) toast('Password reset must be done via Firebase Auth console for security','warn');
+      await audit('Update','users',id,null,upd);
+    } else {
+      // Create new auth user — uses secondary app to avoid signing out current
+      const sec = firebase.apps.find(a=>a.name==='secondary') || firebase.initializeApp(firebaseConfig,'secondary');
+      const secAuth = sec.auth();
+      const cred = await secAuth.createUserWithEmailAndPassword(data.email, data.password);
+      await db.collection('users').doc(cred.user.uid).set({
+        email:data.email, name:data.name, role:data.role, phone:data.phone||null, active:data.active,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: STATE.profile.email
+      });
+      await secAuth.signOut();
+      await audit('Create','users',cred.user.uid,null,{email:data.email,role:data.role});
+    }
+    toast('User saved','ok');
+    bootstrap.Modal.getInstance($('#universal-modal')).hide();
+  }catch(e){ toast(e.message,'err'); }
+  finally{ hideLoader(); }
+}
+async function toggleUser(id){
+  const u = STATE.data.users.find(x=>x.id===id);
+  const ok = await confirmDialog(u.active!==false?'Deactivate user':'Activate user', `Are you sure?`);
+  if(!ok) return;
+  await db.collection('users').doc(id).update({active: u.active===false});
+  await audit('Toggle','users',id,{active:u.active},{active:u.active===false});
+  toast('Updated','ok');
+}
+
+/* ---------- AUDIT LOGS ---------- */
+function renderAuditLogs(){
+  if(STATE.role !== 'super_admin'){ $('#main-view').innerHTML = '<div class="empty"><i class="bi bi-lock"></i><div>Access denied</div></div>'; return; }
+  $('#main-view').innerHTML = `<div class="page-head"><div><h1>Audit Logs</h1><div class="sub">Latest ${STATE.data.auditLogs.length} entries</div></div></div>
+    <div class="section-card"><div class="table-responsive"><table id="dt-audit" class="table table-hover"><thead><tr><th>When</th><th>User</th><th>Role</th><th>Action</th><th>Module</th><th>Record</th></tr></thead><tbody>${STATE.data.auditLogs.map(l=>`<tr>
+      <td style="font-size:12px">${l.timestamp?.toDate?l.timestamp.toDate().toLocaleString('en-IN'):''}</td>
+      <td>${esc(l.userName||l.user)}</td>
+      <td>${esc(l.role||'')}</td>
+      <td><span class="badge-pill b-active">${esc(l.action)}</span></td>
+      <td>${esc(l.module)}</td>
+      <td style="font-size:11px;color:var(--muted)">${esc(l.recordId||'')}</td>
+    </tr>`).join('')}</tbody></table></div></div>`;
+  $('#dt-audit').DataTable({pageLength:50, order:[[0,'desc']]});
+}
+
+/* ---------- SETTINGS ---------- */
+function renderSettings(){
+  const s = STATE.data.settings || {};
+  $('#main-view').innerHTML = `
+    <div class="page-head"><div><h1>Settings</h1><div class="sub">Application configuration</div></div></div>
+    <div class="section-card">
+      <form id="settings-form" class="row g-3">
+        <div class="col-md-6"><label class="form-label">Application Name</label><input class="form-control" name="appName" value="${esc(s.appName||'IAAD HRMS Portal')}"></div>
+        <div class="col-md-6"><label class="form-label">Department Name</label><input class="form-control" name="department" value="${esc(s.department||'Internal Accounts and Audit Directorate')}"></div>
+        <div class="col-md-6"><label class="form-label">Department (Hindi)</label><input class="form-control devanagari" name="departmentHi" value="${esc(s.departmentHi||'आन्तरिक लेखा एवं लेखा परीक्षा निदेशालय')}"></div>
+        <div class="col-md-6"><label class="form-label">Retirement Age</label><input type="number" class="form-control" name="retirementAge" value="${s.retirementAge||60}" readonly></div>
+        <div class="col-md-6"><label class="form-label">Logo URL</label><input class="form-control" name="logoUrl" value="${esc(s.logoUrl||'')}"></div>
+        <div class="col-md-6"><label class="form-label">Default Theme</label><select class="form-select" name="theme"><option value="light" ${s.theme==='light'?'selected':''}>Light</option><option value="dark" ${s.theme==='dark'?'selected':''}>Dark</option></select></div>
+        <div class="col-12"><button class="btn btn-primary" type="button" onclick="saveSettings()"><i class="bi bi-save"></i> Save</button></div>
+      </form>
+    </div>
+    <div class="section-card">
+      <h6>Firestore Security Rules (apply in Firebase Console)</h6>
+      <pre style="background:var(--bg);padding:14px;border-radius:8px;font-size:11px;border:1px solid var(--border);overflow-x:auto">${esc(`rules_version='2';
+service cloud.firestore {
+  match /databases/{db}/documents {
+    function isAuth(){ return request.auth != null; }
+    function role(){ return get(/databases/$(db)/documents/users/$(request.auth.uid)).data.role; }
+    function isAdmin(){ return isAuth() && role() == 'super_admin'; }
+    match /users/{uid} {
+      allow read: if isAuth();
+      allow write: if isAdmin() || request.auth.uid == uid;
+    }
+    match /auditLogs/{id} { allow read: if isAdmin(); allow create: if isAuth(); }
+    match /{col}/{id} {
+      allow read: if isAuth();
+      allow create, update: if isAuth();
+      allow delete: if isAdmin();
+    }
+  }
+}`)}</pre>
+    </div>
+  `;
+}
+async function saveSettings(){
+  const f = $('#settings-form');
+  const d = Object.fromEntries(new FormData(f));
+  d.retirementAge = 60;
+  await db.collection('settings').doc('app').set(d,{merge:true});
+  toast('Settings saved','ok');
+}
+
+/* ---------- GLOBAL SEARCH ---------- */
+function setupGlobalSearch(){
+  const inp = $('#global-search');
+  const out = $('#global-results');
+  inp.addEventListener('input', ()=>{
+    const q = inp.value.trim().toLowerCase();
+    if(!q){ out.classList.remove('show'); return; }
+    const groups = [];
+    const ge = STATE.data.employees.filter(e=>String(e.name||'').toLowerCase().includes(q)||String(e.manavSampadaId||'').includes(q)||String(e.mobile||'').includes(q)).slice(0,6);
+    if(ge.length) groups.push({title:'Employees',items:ge.map(e=>({label:`${e.name} · ${e.manavSampadaId||''}`,sub:e.currentDistrict||'',action:()=>{navigate('employees');setTimeout(()=>viewRecord('employees',e.id),100);}}))});
+    const go = STATE.data.offices.filter(o=>String(o.name||'').toLowerCase().includes(q)||String(o.department||'').toLowerCase().includes(q)).slice(0,6);
+    if(go.length) groups.push({title:'Offices',items:go.map(o=>({label:o.name,sub:`${o.district||''} · ${o.department||''}`,action:()=>{navigate('offices');setTimeout(()=>viewRecord('offices',o.id),100);}}))});
+    if(!groups.length){ out.innerHTML = '<div class="empty" style="padding:20px"><i class="bi bi-search"></i><div>No matches</div></div>'; out.classList.add('show'); return; }
+    out.innerHTML = groups.map(g=>`<div class="gr-section">${g.title}</div>`+g.items.map((it,i)=>`<div class="gr-item" data-gid="${g.title}-${i}"><div>${esc(it.label)}<div style="font-size:11px;color:var(--muted)">${esc(it.sub)}</div></div><i class="bi bi-arrow-right"></i></div>`).join('')).join('');
+    out.classList.add('show');
+    out.querySelectorAll('.gr-item').forEach((el,i)=>{
+      const allItems = groups.flatMap(g=>g.items);
+      el.onclick = ()=>{ allItems[i].action(); out.classList.remove('show'); inp.value=''; };
+    });
+  });
+  document.addEventListener('click',(e)=>{ if(!out.contains(e.target)&&e.target!==inp) out.classList.remove('show'); });
+}
+
+/* ---------- NAVIGATION ---------- */
+function buildSidebar(){
+  const nav = $('#sidebar-nav');
+  nav.innerHTML = MENU.map(m=>{
+    if(m.section) return `<div class="nav-section">${m.section}</div>`;
+    if(m.adminOnly && STATE.role!=='super_admin') return '';
+    return `<div class="nav-item" data-key="${m.key}" data-testid="nav-${m.key}"><i class="bi ${m.icon}"></i><div class="dual-label"><span class="en">${m.label}</span><span class="hi devanagari">${m.hi||''}</span></div></div>`;
+  }).join('');
+  nav.querySelectorAll('.nav-item').forEach(n=>n.addEventListener('click',()=>navigate(n.dataset.key)));
+  document.querySelectorAll('[data-nav]').forEach(a=>a.addEventListener('click',e=>{e.preventDefault();navigate(a.dataset.nav);}));
+}
+function navigate(key){
+  STATE.active = key;
+  $$('.nav-item').forEach(n=>n.classList.toggle('active', n.dataset.key===key));
+  if(window.innerWidth<992) $('#sidebar').classList.remove('open');
+  renderCurrentPage();
+}
+
+/* ---------- THEME ---------- */
+function applyTheme(t){
+  document.documentElement.dataset.theme = t;
+  localStorage.setItem('hrms-theme',t);
+  const icon = $('#theme-toggle i'); if(icon) icon.className = `bi ${t==='dark'?'bi-sun':'bi-moon-stars'}`;
+  if(STATE.user && STATE.active==='dashboard') setTimeout(buildDashboardCharts, 80);
+}
+function initTheme(){ applyTheme(localStorage.getItem('hrms-theme')||'light'); }
+
+/* ---------- LOGIN HANDLERS ---------- */
+$('#login-form').addEventListener('submit', async e=>{
+  e.preventDefault();
+  $('#login-error').style.display='none';
+  try{
+    const email = $('#login-email').value.trim();
+    const pwd = $('#login-password').value;
+    await handleLogin(email,pwd);
+  }catch(e){
+    let m = e.message;
+    if(e.code==='auth/invalid-credential'||e.code==='auth/wrong-password'||e.code==='auth/user-not-found') m='Invalid email or password';
+    if(e.code==='permission-denied' || (m && m.toLowerCase().includes('insufficient permissions'))){
+      m = 'Firestore rules are blocking access. Click "Setup Help" below to view the required rules.';
+      $('#rules-help-btn').style.display='inline-block';
+    }
+    $('#login-error').innerHTML = esc(m);
+    $('#login-error').style.display='block';
+  }
+});
+$('#forgot-link').addEventListener('click', async e=>{
+  e.preventDefault();
+  const email = $('#login-email').value.trim();
+  if(!email){ toast('Enter your email first','warn'); return; }
+  try{ await auth.sendPasswordResetEmail(email); toast('Password reset email sent','ok'); }catch(e){ toast(e.message,'err'); }
+});
+$('#logout-btn').addEventListener('click', async e=>{ e.preventDefault(); await audit('Logout','auth'); await auth.signOut(); });
+$('#change-pwd-link').addEventListener('click', async e=>{
+  e.preventDefault();
+  const np = prompt('New password (min 6 chars):');
+  if(!np||np.length<6) return;
+  try{ await auth.currentUser.updatePassword(np); toast('Password changed','ok'); }catch(e){ toast(e.message,'err'); }
+});
+$('#theme-toggle').addEventListener('click', ()=>applyTheme(document.documentElement.dataset.theme==='dark'?'light':'dark'));
+$('#sidebar-toggle').addEventListener('click', ()=>$('#sidebar').classList.toggle('open'));
+
+/* ---------- DASHBOARD PDF ---------- */
+async function exportDashboardPDF(){
+  showLoader();
+  try{
+    const el = $('#main-view');
+    const canvas = await html2canvas(el,{backgroundColor:getComputedStyle(document.body).backgroundColor,scale:1.4});
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({orientation:'portrait',unit:'pt',format:'a4'});
+    const w = pdf.internal.pageSize.getWidth();
+    const h = (canvas.height * w) / canvas.width;
+    pdf.addImage(canvas.toDataURL('image/png'),'PNG',0,0,w,h);
+    pdf.save(`dashboard-${Date.now()}.pdf`);
+  } finally { hideLoader(); }
+}
+
+/* ---------- AUTH STATE ---------- */
+auth.onAuthStateChanged(async user=>{
+  if(user){
+    showLoader();
+    try{
+      let udoc = await db.collection('users').doc(user.uid).get();
+      if(!udoc.exists){
+        const allU = await db.collection('users').limit(1).get();
+        const role = allU.empty?'super_admin':'user';
+        await db.collection('users').doc(user.uid).set({email:user.email,name:user.email.split('@')[0],role,active:true,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+        udoc = await db.collection('users').doc(user.uid).get();
+      }
+      const p = udoc.data();
+      if(p.active===false){ await auth.signOut(); $('#login-error').textContent='Account is deactivated'; $('#login-error').style.display='block'; return; }
+      STATE.user = user; STATE.profile = p; STATE.role = p.role;
+      $('#auth-screen').style.display='none';
+      $('#app-shell').classList.add('active');
+      $('#user-name').textContent = p.name || user.email;
+      $('#user-role').textContent = p.role;
+      $('#user-av').textContent = (p.name||user.email).slice(0,2).toUpperCase();
+      buildSidebar();
+      setupGlobalSearch();
+      navigate('dashboard');
+      attachListeners();
+      audit('Login','auth');
+    } finally { hideLoader(); }
+  } else {
+    detachListeners();
+    STATE.user=null; STATE.profile=null; STATE.role=null;
+    $('#auth-screen').style.display='flex';
+    $('#app-shell').classList.remove('active');
+  }
+});
+
+/* ---------- INIT ---------- */
+initTheme();
+ensureSuperAdmin();
+
+/* Expose for inline handlers */
+window.openForm = openForm;
+window.viewRecord = viewRecord;
+window.deleteRecord = deleteRecord;
+window.exportModule = exportModule;
+window.openBulkImport = openBulkImport;
+window.doBulkImport = doBulkImport;
+window.downloadTemplate = downloadTemplate;
+window.runReport = runReport;
+window.downloadCustomReport = downloadCustomReport;
+window.runCustomReport = runCustomReport;
+window.saveCustomReport = saveCustomReport;
+window.openUserForm = openUserForm;
+window.saveUser = saveUser;
+window.toggleUser = toggleUser;
+window.saveSettings = saveSettings;
+window.exportDashboardPDF = exportDashboardPDF;
+window.navigate = navigate;
+</script>
+</body>
+</html>
