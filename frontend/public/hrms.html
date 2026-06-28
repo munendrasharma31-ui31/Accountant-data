@@ -1087,7 +1087,7 @@ function renderListPage(modKey){
     <div class="section-card">
       <div class="table-responsive">
         <table id="dt-${modKey}" class="table table-hover" style="width:100%">
-          <thead><tr>${mod.columns.map(c=>`<th>${c.label}</th>`).join('')}<th>Actions</th></tr></thead>
+          <thead><tr>${mod.columns.map(c=>`<th>${c.label}</th>`).join('')}<th>Remarks</th><th>Actions</th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
@@ -1108,7 +1108,7 @@ function renderTable(modKey){
     if(c.render) v = c.render(v);
     else v = esc(v==null?'':v);
     return `<td>${v}</td>`;
-  }).join('')}<td class="text-nowrap">
+  }).join('')}<td style="max-width:240px" title="${esc(row._remarks||'')}"><div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(row._remarks||'')}</div></td><td class="text-nowrap">
     <button class="btn btn-sm btn-outline-secondary" onclick="viewRecord('${modKey}','${row.id}')" title="View" data-testid="view-${row.id}"><i class="bi bi-eye"></i></button>
     ${canEditUI?`<button class="btn btn-sm btn-outline-primary" onclick="openForm('${modKey}','${row.id}')" title="Edit" data-testid="edit-${row.id}"><i class="bi bi-pencil"></i></button>`:''}
     ${isAdminUI?`<button class="btn btn-sm btn-outline-danger" onclick="deleteRecord('${modKey}','${row.id}')" title="Delete" data-testid="delete-${row.id}"><i class="bi bi-trash"></i></button>`:''}
@@ -1141,6 +1141,7 @@ function enrichRows(modKey, rows){
       o._durDistrict = durStr(r.districtJoiningDate || r.joiningDate, cutoff);
       o._durDivision = durStr(r.divisionJoiningDate || r.joiningDate, cutoff);
     }
+    o._remarks = joinedRemarks(r);
     return o;
   });
 }
