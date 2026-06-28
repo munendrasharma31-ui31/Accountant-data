@@ -446,6 +446,16 @@ const today = ()=> new Date();
 const showLoader = ()=> $('#loader').classList.add('active');
 const hideLoader = ()=> $('#loader').classList.remove('active');
 
+// Role helpers — super_admin > editor > viewer
+const isAdmin = ()=> STATE.role === 'super_admin';
+const isEditor = ()=> STATE.role === 'super_admin' || STATE.role === 'editor' || STATE.role === 'user'; // 'user' is legacy alias for editor
+const isViewer = ()=> STATE.role === 'viewer';
+const canEdit = ()=> isEditor();           // editor + super_admin can add/edit
+const canDelete = ()=> isAdmin();           // only super_admin can delete
+const canEditSanctioned = ()=> isAdmin();   // editor cannot touch sanctioned + auto fields
+const canManageUsers = ()=> isAdmin();
+const PROTECTED_FIELDS = ['sanctioned','seniority','retirementDate']; // editor cannot change these
+
 // Returns non-empty remarks (remark1/2/3) plus legacy 'remarks' field for old records
 function nonEmptyRemarks(rec){
   if(!rec) return [];
@@ -1058,8 +1068,8 @@ const MODULES = {
 function renderListPage(modKey){
   const mod = MODULES[modKey];
   const main = $('#main-view');
-  const isAdmin = STATE.role === 'super_admin';
-  const allowAdd = isAdmin || STATE.role === 'user';
+  const isAdminUI = isAdmin();
+  const allowAdd = canEdit();
   main.innerHTML = `
     <div class="page-head">
       <div>
@@ -1091,7 +1101,8 @@ function renderTable(modKey){
   if(jQuery.fn.DataTable && jQuery.fn.dataTable.isDataTable(tbl)){ jQuery(tbl).DataTable().destroy(); }
   const data = enrichRows(modKey, STATE.data[modKey]);
   if(modKey==='offices') computeOfficeStats();
-  const isAdmin = STATE.role === 'super_admin';
+  const isAdminUI = isAdmin();
+  const canEditUI = canEdit();
   jQuery(`${tbl} tbody`).html(data.map(row=>`<tr>${mod.columns.map(c=>{
     let v = row[c.key];
     if(c.render) v = c.render(v);
@@ -1099,8 +1110,8 @@ function renderTable(modKey){
     return `<td>${v}</td>`;
   }).join('')}<td class="text-nowrap">
     <button class="btn btn-sm btn-outline-secondary" onclick="viewRecord('${modKey}','${row.id}')" title="View" data-testid="view-${row.id}"><i class="bi bi-eye"></i></button>
-    <button class="btn btn-sm btn-outline-primary" onclick="openForm('${modKey}','${row.id}')" title="Edit" data-testid="edit-${row.id}"><i class="bi bi-pencil"></i></button>
-    ${isAdmin?`<button class="btn btn-sm btn-outline-danger" onclick="deleteRecord('${modKey}','${row.id}')" title="Delete" data-testid="delete-${row.id}"><i class="bi bi-trash"></i></button>`:''}
+    ${canEditUI?`<button class="btn btn-sm btn-outline-primary" onclick="openForm('${modKey}','${row.id}')" title="Edit" data-testid="edit-${row.id}"><i class="bi bi-pencil"></i></button>`:''}
+    ${isAdminUI?`<button class="btn btn-sm btn-outline-danger" onclick="deleteRecord('${modKey}','${row.id}')" title="Delete" data-testid="delete-${row.id}"><i class="bi bi-trash"></i></button>`:''}
   </td></tr>`).join(''));
   jQuery(tbl).DataTable({
     pageLength:25,
@@ -1152,10 +1163,13 @@ let currentEdit = {modKey:null, id:null};
 function openForm(modKey, id=null){
   const mod = MODULES[modKey];
   if(!mod) return;
+  if(!canEdit()){ toast('Read-only access. You do not have permission to add/edit.','warn'); return; }
   currentEdit = {modKey, id};
   const existing = id ? STATE.data[modKey].find(x=>x.id===id) : {};
   $('#um-title').textContent = (id?'Edit ':'Add ')+mod.title;
-  $('#um-body').innerHTML = `<form id="record-form" class="row g-3">
+  const editorNote = (!isAdmin() && isEditor())?'<div class="alert alert-info py-2 small mb-3"><i class="bi bi-info-circle"></i> Editor role: sanctioned posts, seniority and auto-calculated fields are locked.</div>':'';
+  const adminNote = isAdmin()?'<div class="alert alert-success py-2 small mb-3"><i class="bi bi-shield-check"></i> Super Admin: required-field validation is bypassed — you may save partial entries.</div>':'';
+  $('#um-body').innerHTML = `${adminNote}${editorNote}<form id="record-form" class="row g-3" ${isAdmin()?'novalidate':''}>
     ${mod.form.map(f=>renderFormField(f, existing)).join('')}
   </form>`;
   $('#um-footer').innerHTML = `
@@ -1172,38 +1186,47 @@ function openForm(modKey, id=null){
     }
   });
 }
+function isFieldLocked(f){
+  // Editor cannot touch protected fields (sanctioned, seniority, retirementDate)
+  if(isEditor() && !isAdmin() && PROTECTED_FIELDS.includes(f.key)) return true;
+  return false;
+}
 function renderFormField(f, existing){
   const val = existing[f.key] ?? f.default ?? '';
   const col = f.full ? 'col-12' : 'col-md-6';
-  const ro = f.readonly ? 'readonly' : '';
-  const req = f.req ? 'required' : '';
-  const lab = `<label class="form-label">${f.label}${f.hi?` <span class="devanagari" style="color:var(--muted);font-size:11px"> · ${f.hi}</span>`:''}${f.req?' <span class="text-danger">*</span>':''}</label>`;
+  const locked = isFieldLocked(f);
+  const ro = (f.readonly || locked) ? 'readonly' : '';
+  // Super-admin bypasses required so they can save partial entries
+  const req = (f.req && !isAdmin()) ? 'required' : '';
+  const lockBadge = locked? ' <span class="badge bg-secondary" style="font-size:9px;vertical-align:middle">LOCKED</span>':'';
+  const lab = `<label class="form-label">${f.label}${f.hi?` <span class="devanagari" style="color:var(--muted);font-size:11px"> · ${f.hi}</span>`:''}${f.req?' <span class="text-danger">*</span>':''}${lockBadge}</label>`;
+  const disabledAttr = locked? 'disabled':'';
   if(f.type==='select'){
-    return `<div class="${col}">${lab}<select class="form-select" name="${f.key}" ${req}><option value="">— Select —</option>${f.opts.map(o=>`<option value="${esc(o)}" ${o===val?'selected':''}>${esc(o)}</option>`).join('')}</select></div>`;
+    return `<div class="${col}">${lab}<select class="form-select" name="${f.key}" ${req} ${disabledAttr}><option value="">— Select —</option>${f.opts.map(o=>`<option value="${esc(o)}" ${o===val?'selected':''}>${esc(o)}</option>`).join('')}</select></div>`;
   }
   if(f.type==='employee'){
     const opts = STATE.data.employees.map(e=>`<option value="${esc(e.id)}" data-mid="${esc(e.manavSampadaId||'')}" ${e.id===val?'selected':''}>${esc(e.name)} (${esc(e.manavSampadaId||'')})</option>`).join('');
-    return `<div class="${col}">${lab}<select class="form-select" name="${f.key}" ${req}><option value="">— Select Employee —</option>${opts}</select><small class="text-muted">Type EHRMS / Name to filter (browser native search)</small></div>`;
+    return `<div class="${col}">${lab}<select class="form-select" name="${f.key}" ${req} ${disabledAttr}><option value="">— Select Employee —</option>${opts}</select><small class="text-muted">Type EHRMS / Name to filter (browser native search)</small></div>`;
   }
   if(f.type==='office'){
     const opts = STATE.data.offices.map(o=>`<option value="${esc(o.id)}" data-district="${esc(o.district)}" ${o.id===val?'selected':''}>${esc(o.name)} — ${esc(o.district||'')}</option>`).join('');
-    return `<div class="${col}">${lab}<select class="form-select" name="${f.key}" ${req} ${ro?'disabled':''}><option value="">— Select Office —</option>${opts}</select></div>`;
+    return `<div class="${col}">${lab}<select class="form-select" name="${f.key}" ${req} ${ro?'disabled':''} ${disabledAttr}><option value="">— Select Office —</option>${opts}</select></div>`;
   }
   if(f.type==='department'){
     const opts = (STATE.data.departments||[]).map(d=>`<option value="${esc(d.id)}" ${d.id===val?'selected':''}>${esc(d.name)}</option>`).join('');
-    return `<div class="${col}">${lab}<select class="form-select" name="${f.key}" ${req}><option value="">— Select Department —</option>${opts}</select></div>`;
+    return `<div class="${col}">${lab}<select class="form-select" name="${f.key}" ${req} ${disabledAttr}><option value="">— Select Department —</option>${opts}</select></div>`;
   }
   if(f.type==='textarea'){
-    return `<div class="${col}">${lab}<textarea class="form-control" name="${f.key}" rows="2" ${ro}>${esc(val||'')}</textarea></div>`;
+    return `<div class="${col}">${lab}<textarea class="form-control" name="${f.key}" rows="2" ${ro} ${disabledAttr}>${esc(val||'')}</textarea></div>`;
   }
   if(f.type==='checkbox'){
-    return `<div class="${col}"><div class="form-check mt-4 pt-2"><input class="form-check-input" type="checkbox" name="${f.key}" ${val?'checked':''}><label class="form-check-label">${f.label}</label></div></div>`;
+    return `<div class="${col}"><div class="form-check mt-4 pt-2"><input class="form-check-input" type="checkbox" name="${f.key}" ${val?'checked':''} ${disabledAttr}><label class="form-check-label">${f.label}</label></div></div>`;
   }
   if(f.type==='file'){
     const cur = val ? `<div class="mt-2"><img src="${esc(val)}" class="photo-thumb"></div>` : '';
-    return `<div class="${col}">${lab}<input class="form-control" type="file" name="${f.key}" accept="image/*">${cur}</div>`;
+    return `<div class="${col}">${lab}<input class="form-control" type="file" name="${f.key}" accept="image/*" ${disabledAttr}>${cur}</div>`;
   }
-  return `<div class="${col}">${lab}<input class="form-control" type="${f.type||'text'}" name="${f.key}" value="${esc(val||'')}" ${ro} ${req}></div>`;
+  return `<div class="${col}">${lab}<input class="form-control" type="${f.type||'text'}" name="${f.key}" value="${esc(val||'')}" ${ro} ${req} ${disabledAttr}></div>`;
 }
 function handleFieldChange(action, srcKey){
   if(action==='autoRetirement'){
@@ -1273,13 +1296,17 @@ function setCutoffDate(v){
 }
 
 async function saveRecord(){
+  if(!canEdit()){ toast('Read-only access','warn'); return; }
   const {modKey,id} = currentEdit;
   const mod = MODULES[modKey];
   const form = $('#record-form');
-  if(!form.checkValidity()){ form.reportValidity(); return; }
+  // Super admin bypasses HTML5 required validation; editor/legacy 'user' must satisfy
+  if(!isAdmin() && !form.checkValidity()){ form.reportValidity(); return; }
   const data = {};
   const fileField = mod.form.find(f=>f.type==='file');
   for(const f of mod.form){
+    // Editor cannot modify protected fields — skip them so existing value is preserved
+    if(isFieldLocked(f)) continue;
     const el = form.querySelector(`[name="${f.key}"]`);
     if(!el) continue;
     if(f.type==='checkbox') data[f.key] = el.checked;
@@ -1427,11 +1454,29 @@ async function applyBusinessRules(modKey, recId, newData, oldData){
       return;
     }
   }
-  // If employee status changed to Terminated/Deceased/Retired/VRS via direct edit
+  // If employee status changed to Terminated/Deceased/Retired/VRS via direct edit → mirror to corresponding module
   if(modKey==='employees' && oldData && newData.status && newData.status!==oldData.status){
     if(['Terminated','Deceased','Retired','Voluntary Retirement'].includes(newData.status)){
       const ac = STATE.data.additionalCharges.filter(c=>c.employeeId===recId && c.status==='Active');
       ac.forEach(c=>{ batch.update(db.collection('additionalCharges').doc(c.id),{status:'Cancelled', cancellationDate:fmtISO(new Date())}); dirty=true; });
+      // Mirror: create Death / Retirement record if not already present
+      const todayISO = fmtISO(new Date());
+      if(newData.status==='Deceased'){
+        const already = STATE.data.deceased.some(d=>d.employeeId===recId);
+        if(!already){
+          const ref = db.collection('deceasedEmployees').doc();
+          batch.set(ref, {employeeId:recId, deathDate: newData.deathDate || todayISO, orderNumber:'(auto from employee status change)', autoCreated:true, createdAt: firebase.firestore.FieldValue.serverTimestamp()});
+          dirty=true;
+        }
+      }
+      if(newData.status==='Retired' || newData.status==='Voluntary Retirement'){
+        const already = STATE.data.retirements.some(r=>r.employeeId===recId);
+        if(!already){
+          const ref = db.collection('retirements').doc();
+          batch.set(ref, {employeeId:recId, retirementDate: newData.retirementActualDate || newData.retirementDate || todayISO, orderNumber:'(auto from employee status change)', type: newData.status==='Voluntary Retirement'?'Voluntary Retirement':'Superannuation', autoCreated:true, createdAt: firebase.firestore.FieldValue.serverTimestamp()});
+          dirty=true;
+        }
+      }
       if(dirty){ await batch.commit(); dirty=false; }
       await promptVacatePost(recId, newData.status);
       return;
@@ -1515,7 +1560,7 @@ function renderRelatedHistory(modKey,r){
 
 /* ---------- DELETE ---------- */
 async function deleteRecord(modKey,id){
-  if(STATE.role!=='super_admin'){ toast('Permission denied','err'); return; }
+  if(!canDelete()){ toast('Permission denied — only Super Admin can delete','err'); return; }
   // Integrity
   const integrity = checkIntegrity(modKey,id);
   if(integrity){ toast(integrity,'warn'); return; }
@@ -1551,6 +1596,7 @@ function checkIntegrity(modKey,id){
 
 /* ---------- BULK IMPORT / EXPORT ---------- */
 function openBulkImport(modKey){
+  if(!canEdit()){ toast('Read-only access','warn'); return; }
   const mod = MODULES[modKey];
   $('#um-title').textContent = `Bulk Import — ${mod.title}`;
   const fields = mod.form.filter(f=>f.type!=='file').map(f=>f.key).join(', ');
@@ -2087,7 +2133,7 @@ function renderUsers(){
     <div class="section-card"><div class="table-responsive"><table id="dt-users" class="table table-hover" style="width:100%"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead><tbody>${STATE.data.users.map(u=>`<tr>
       <td>${esc(u.name||'')}</td>
       <td>${esc(u.email||'')}</td>
-      <td><span class="badge-pill ${u.role==='super_admin'?'b-promoted':'b-active'}">${esc(u.role||'')}</span></td>
+      <td><span class="badge-pill ${u.role==='super_admin'?'b-promoted':(u.role==='viewer'?'b-inactive':'b-active')}">${esc(u.role==='user'?'editor':(u.role||''))}</span></td>
       <td><span class="badge-pill ${u.active!==false?'b-working':'b-inactive'}">${u.active!==false?'Active':'Inactive'}</span></td>
       <td>${u.createdAt?.toDate?fmt(u.createdAt.toDate()):''}</td>
       <td class="text-nowrap">
@@ -2102,7 +2148,11 @@ function openUserForm(id=null){
   $('#um-body').innerHTML = `<form id="user-form" class="row g-3">
     <div class="col-md-6"><label class="form-label">Name *</label><input class="form-control" name="name" value="${esc(existing.name||'')}" required></div>
     <div class="col-md-6"><label class="form-label">Email *</label><input class="form-control" type="email" name="email" value="${esc(existing.email||'')}" ${id?'readonly':''} required></div>
-    <div class="col-md-6"><label class="form-label">Role *</label><select class="form-select" name="role" required><option value="user" ${existing.role==='user'?'selected':''}>User</option><option value="super_admin" ${existing.role==='super_admin'?'selected':''}>Super Admin</option></select></div>
+    <div class="col-md-6"><label class="form-label">Role *</label><select class="form-select" name="role" required>
+      <option value="viewer" ${existing.role==='viewer'?'selected':''}>Viewer (read-only)</option>
+      <option value="editor" ${(existing.role==='editor'||existing.role==='user')?'selected':''}>Editor (add/edit, no delete, locked sanctioned)</option>
+      <option value="super_admin" ${existing.role==='super_admin'?'selected':''}>Super Admin (full access)</option>
+    </select></div>
     <div class="col-md-6"><label class="form-label">${id?'Reset Password (leave blank to keep)':'Password *'}</label><input class="form-control" type="text" name="password" ${id?'':'required minlength="6"'}></div>
     <div class="col-md-6"><label class="form-label">Phone</label><input class="form-control" name="phone" value="${esc(existing.phone||'')}"></div>
     <div class="col-md-6 d-flex align-items-end"><div class="form-check"><input class="form-check-input" type="checkbox" name="active" ${existing.active!==false?'checked':''}><label class="form-check-label">Active</label></div></div>
@@ -2405,7 +2455,7 @@ auth.onAuthStateChanged(async user=>{
       const isSeed = (user.email||'').toLowerCase() === SEED_ADMIN;
       let udoc = await db.collection('users').doc(user.uid).get();
       if(!udoc.exists){
-        let role = 'user';
+        let role = 'editor';
         if(isSeed){ role = 'super_admin'; }
         else {
           try{ const allU = await db.collection('users').limit(1).get(); if(allU.empty) role='super_admin'; }catch(e){}
@@ -2418,6 +2468,8 @@ auth.onAuthStateChanged(async user=>{
         udoc = await db.collection('users').doc(user.uid).get();
       }
       const p = udoc.data();
+      // Normalize legacy 'user' role → 'editor' for display only (STATE.role)
+      if(p.role === 'user') p.role = 'editor';
       if(p.active===false){ await auth.signOut(); $('#login-error').textContent='Account is deactivated'; $('#login-error').style.display='block'; return; }
       STATE.user = user; STATE.profile = p; STATE.role = p.role;
       $('#auth-screen').style.display='none';
