@@ -893,6 +893,7 @@ const MODULES = {
     title:'Offices', hi:'कार्यालय', collection:'offices',
     columns:[
       {key:'name',label:'Office Name'},
+      {key:'ofcadmId',label:'OFCADM ID'},
       {key:'departmentName',label:'Department'},
       {key:'district',label:'District'},
       {key:'division',label:'Division'},
@@ -904,7 +905,8 @@ const MODULES = {
     ],
     form:[
       {key:'name',label:'Office Name',hi:'कार्यालय का नाम',req:true,full:true},
-      {key:'departmentId',label:'Department',hi:'विभाग का नाम',type:'department',req:true,full:true},
+      {key:'ofcadmId',label:'OFCADM ID',hi:'ओएफसीएडीएम आई0डी0'},
+      {key:'departmentId',label:'Department',hi:'विभाग का नाम',type:'department',req:true},
       {key:'district',label:'District',type:'select',opts:DISTRICTS,req:true,onChange:'syncDivision'},
       {key:'division',label:'Division',type:'select',opts:DIVISIONS,req:true},
       {key:'sanctioned',label:'Sanctioned Posts',type:'number',req:true},
@@ -1909,7 +1911,7 @@ function renderOfficeSearch(){
     if(!list.length){ out.innerHTML='<div class="text-muted small">No matches</div>'; return; }
     out.innerHTML = `<div class="list-group">${list.map(o=>`<button class="list-group-item list-group-item-action" data-testid="office-result-${esc(o.id)}" onclick="showOfficeFullDetail('${esc(o.id)}')">
       <div class="d-flex justify-content-between">
-        <div><b>${esc(o.name)}</b></div>
+        <div><b>${esc(o.name)}</b>${o.ofcadmId?` <span class="text-muted small">· OFCADM ${esc(o.ofcadmId)}</span>`:''}</div>
         <div class="small text-muted">${esc(o.district||'')} · ${esc(o.division||'')}</div>
       </div>
       <div class="small text-muted">${esc(dnMap[o.departmentId]||o.department||'')}</div>
@@ -1939,6 +1941,7 @@ function showOfficeFullDetail(officeId){
         </div>
       </div>
       <dl class="row mb-0">
+        <dt class="col-sm-3">OFCADM ID</dt><dd class="col-sm-9">${esc(o.ofcadmId||'-')}</dd>
         <dt class="col-sm-3">Department</dt><dd class="col-sm-9">${esc(dept?.name||o.department||'-')}</dd>
         <dt class="col-sm-3">District / Division</dt><dd class="col-sm-9">${esc(o.district||'-')} · ${esc(o.division||'-')}</dd>
         <dt class="col-sm-3">Sanctioned · Filled · Vacant</dt><dd class="col-sm-9"><b>${o.sanctioned||0}</b> · <b style="color:var(--ok)">${o._filled||0}</b> · <b style="color:var(--bad)">${o._vacant||0}</b></dd>
@@ -2225,7 +2228,7 @@ function setupGlobalSearch(){
     const deptMap = Object.fromEntries((STATE.data.departments||[]).map(d=>[d.id,d.name]));
     const go = STATE.data.offices.filter(o=>{
       const dn = deptMap[o.departmentId]||o.department||'';
-      const hay = [o.name, dn, o.district, o.division, joinedRemarks(o)].filter(Boolean).join(' ').toLowerCase();
+      const hay = [o.name, o.ofcadmId, dn, o.district, o.division, joinedRemarks(o)].filter(Boolean).join(' ').toLowerCase();
       return hay.includes(q);
     }).slice(0,8);
     if(go.length) groups.push({title:'Offices',items:go.map(o=>({label:o.name,sub:`${o.district||''} · ${deptMap[o.departmentId]||o.department||''}`,action:()=>{navigate('offices');setTimeout(()=>viewRecord('offices',o.id),120);}}))});
