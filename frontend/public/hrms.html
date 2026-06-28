@@ -140,7 +140,7 @@ table.dataTable tbody tr:hover{background:rgba(184,134,42,.08)}
 .app-toast.info{border-left:4px solid var(--info)}
 @keyframes tin{from{transform:translateX(20px);opacity:0}to{transform:translateX(0);opacity:1}}
 
-#loader{position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;align-items:center;justify-content:center;z-index:3000}
+#loader{position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;align-items:center;justify-content:center;z-index:1040}
 #loader.active{display:flex}
 #loader .sp{width:54px;height:54px;border:4px solid rgba(255,255,255,.2);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -445,6 +445,18 @@ const fmtISO = (d)=>{ if(!d) return ''; const x = typeof d==='string'?new Date(d
 const today = ()=> new Date();
 const showLoader = ()=> $('#loader').classList.add('active');
 const hideLoader = ()=> $('#loader').classList.remove('active');
+
+// Returns non-empty remarks (remark1/2/3) plus legacy 'remarks' field for old records
+function nonEmptyRemarks(rec){
+  if(!rec) return [];
+  const out = [];
+  ['remark1','remark2','remark3','remarks'].forEach(k=>{
+    const v = rec[k];
+    if(v && String(v).trim()) out.push(String(v).trim());
+  });
+  return out;
+}
+function joinedRemarks(rec, sep=' | '){ return nonEmptyRemarks(rec).join(sep); }
 const esc = (s)=> String(s==null?'':s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
 function toast(msg,type='info'){
   const c = $('#toast-container');
@@ -840,7 +852,9 @@ const MODULES = {
       {key:'currentDistrict',label:'Current District',type:'select',opts:DISTRICTS},
       {key:'seniority',label:'Seniority Number',type:'number'},
       {key:'status',label:'Status',type:'select',opts:STATUSES,default:'Working'},
-      {key:'remarks',label:'Remarks',type:'textarea',full:true},
+      {key:'remark1',label:'Remark 1',hi:'टिप्पणी 1',type:'textarea',full:true},
+      {key:'remark2',label:'Remark 2',hi:'टिप्पणी 2',type:'textarea',full:true},
+      {key:'remark3',label:'Remark 3',hi:'टिप्पणी 3',type:'textarea',full:true},
       {key:'photoURL',label:'Photo',type:'file',full:true}
     ]
   },
@@ -870,7 +884,9 @@ const MODULES = {
       {key:'districtJoiningDate',label:'District Joining Date',hi:'जनपद में कार्यभार ग्रहण की तिथि',type:'date'},
       {key:'divisionJoiningDate',label:'Division Joining Date',hi:'मण्डल में कार्यभार ग्रहण की तिथि',type:'date'},
       {key:'cadreJoiningDate',label:'Cadre Joining Date',hi:'लेखाकार पद पर कार्यभार ग्रहण की तिथि',type:'date'},
-      {key:'remarks',label:'Remarks',type:'textarea',full:true}
+      {key:'remark1',label:'Remark 1',hi:'टिप्पणी 1',type:'textarea',full:true},
+      {key:'remark2',label:'Remark 2',hi:'टिप्पणी 2',type:'textarea',full:true},
+      {key:'remark3',label:'Remark 3',hi:'टिप्पणी 3',type:'textarea',full:true}
     ]
   },
   offices: {
@@ -893,7 +909,9 @@ const MODULES = {
       {key:'division',label:'Division',type:'select',opts:DIVISIONS,req:true},
       {key:'sanctioned',label:'Sanctioned Posts',type:'number',req:true},
       {key:'demand',label:'Office Demand',hi:'कार्यालय की मांग',type:'textarea'},
-      {key:'remarks',label:'Remarks',type:'textarea',full:true}
+      {key:'remark1',label:'Remark 1',hi:'टिप्पणी 1',type:'textarea',full:true},
+      {key:'remark2',label:'Remark 2',hi:'टिप्पणी 2',type:'textarea',full:true},
+      {key:'remark3',label:'Remark 3',hi:'टिप्पणी 3',type:'textarea',full:true}
     ]
   },
   additionalCharges: {
@@ -920,7 +938,9 @@ const MODULES = {
       {key:'effectiveDate',label:'Effective Date',type:'date',req:true},
       {key:'cancellationDate',label:'Cancellation Date',type:'date'},
       {key:'status',label:'Status',type:'select',opts:['Active','Cancelled'],default:'Active'},
-      {key:'remarks',label:'Remarks',type:'textarea',full:true}
+      {key:'remark1',label:'Remark 1',hi:'टिप्पणी 1',type:'textarea',full:true},
+      {key:'remark2',label:'Remark 2',hi:'टिप्पणी 2',type:'textarea',full:true},
+      {key:'remark3',label:'Remark 3',hi:'टिप्पणी 3',type:'textarea',full:true}
     ]
   },
   attachments: {
@@ -945,7 +965,9 @@ const MODULES = {
       {key:'effectiveDate',label:'Effective Date',type:'date',req:true},
       {key:'endDate',label:'End Date',type:'date'},
       {key:'status',label:'Status',type:'select',opts:['Active','Ended'],default:'Active'},
-      {key:'remarks',label:'Remarks',type:'textarea',full:true}
+      {key:'remark1',label:'Remark 1',hi:'टिप्पणी 1',type:'textarea',full:true},
+      {key:'remark2',label:'Remark 2',hi:'टिप्पणी 2',type:'textarea',full:true},
+      {key:'remark3',label:'Remark 3',hi:'टिप्पणी 3',type:'textarea',full:true}
     ]
   },
   promotionForgo: {
@@ -964,7 +986,9 @@ const MODULES = {
       {key:'orderDate',label:'Order Date',type:'date',req:true},
       {key:'effectiveDate',label:'Effective Date',type:'date'},
       {key:'reason',label:'Reason',type:'textarea'},
-      {key:'remarks',label:'Remarks',type:'textarea',full:true}
+      {key:'remark1',label:'Remark 1',hi:'टिप्पणी 1',type:'textarea',full:true},
+      {key:'remark2',label:'Remark 2',hi:'टिप्पणी 2',type:'textarea',full:true},
+      {key:'remark3',label:'Remark 3',hi:'टिप्पणी 3',type:'textarea',full:true}
     ]
   },
   retirements: {
@@ -983,7 +1007,9 @@ const MODULES = {
       {key:'orderNumber',label:'Retirement Order Number',req:true},
       {key:'orderDate',label:'Retirement Order Date',type:'date'},
       {key:'type',label:'Type',type:'select',opts:['Superannuation','Voluntary Retirement'],default:'Superannuation'},
-      {key:'remarks',label:'Remarks',type:'textarea',full:true}
+      {key:'remark1',label:'Remark 1',hi:'टिप्पणी 1',type:'textarea',full:true},
+      {key:'remark2',label:'Remark 2',hi:'टिप्पणी 2',type:'textarea',full:true},
+      {key:'remark3',label:'Remark 3',hi:'टिप्पणी 3',type:'textarea',full:true}
     ]
   },
   deceased: {
@@ -1000,7 +1026,9 @@ const MODULES = {
       {key:'deathDate',label:'Death Date',type:'date',req:true},
       {key:'orderNumber',label:'Death Order Number'},
       {key:'orderDate',label:'Death Order Date',type:'date'},
-      {key:'remarks',label:'Remarks',type:'textarea',full:true}
+      {key:'remark1',label:'Remark 1',hi:'टिप्पणी 1',type:'textarea',full:true},
+      {key:'remark2',label:'Remark 2',hi:'टिप्पणी 2',type:'textarea',full:true},
+      {key:'remark3',label:'Remark 3',hi:'टिप्पणी 3',type:'textarea',full:true}
     ]
   },
   departments: {
@@ -1017,7 +1045,9 @@ const MODULES = {
     form:[
       {key:'name',label:'Department Name',hi:'विभाग का नाम',req:true,full:true},
       {key:'shortName',label:'Short Name / Abbreviation'},
-      {key:'remarks',label:'Remarks',type:'textarea',full:true}
+      {key:'remark1',label:'Remark 1',hi:'टिप्पणी 1',type:'textarea',full:true},
+      {key:'remark2',label:'Remark 2',hi:'टिप्पणी 2',type:'textarea',full:true},
+      {key:'remark3',label:'Remark 3',hi:'टिप्पणी 3',type:'textarea',full:true}
     ]
   }
 };
@@ -1324,6 +1354,7 @@ async function saveRecord(){
 
 /* Prompt for posting conflict (active AC/attachment in target office) */
 function postingConflictPrompt(acs, ats){
+  hideLoader();
   return new Promise(res=>{
     const list = [
       ...acs.map(c=>`<li>Additional Charge: ${esc(STATE.data.employees.find(e=>e.id===c.employeeId)?.name||c.employeeId)} (${esc(c.orderNumber||'')})</li>`),
@@ -1411,6 +1442,7 @@ async function applyBusinessRules(modKey, recId, newData, oldData){
 async function promptVacatePost(empId, reason){
   const p = STATE.data.postings.find(x=>x.employeeId===empId);
   if(!p) return;
+  hideLoader();
   const emp = STATE.data.employees.find(x=>x.id===empId);
   const ok = await new Promise(res=>{
     const html = `<div class="modal fade" id="vac-modal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
@@ -1447,6 +1479,8 @@ function viewRecord(modKey,id){
   $('#um-title').textContent = mod.title + ' Detail';
   const rows = mod.form.map(f=>{
     let v = r[f.key];
+    // Skip blank remark fields in detail view
+    if(/^remark[123]$/.test(f.key) && (!v || !String(v).trim())) return '';
     if(f.type==='date') v = fmt(v);
     if(f.type==='employee') v = r.employeeName || v;
     if(f.type==='office') v = r.officeName || v;
@@ -1582,12 +1616,16 @@ function exportModule(modKey, fmt='xlsx'){
   const mod = MODULES[modKey];
   const data = enrichRows(modKey, STATE.data[modKey]);
   const cols = mod.columns.filter(c=>c.export!==false);
-  const head = cols.map(c=>c.label);
-  const rows = data.map(r=>cols.map(c=>{
-    const v = r[c.key];
-    if(c.type==='date') return v? new Date(v).toLocaleDateString('en-IN'):'';
-    return v==null?'':String(v).replace(/<[^>]+>/g,'');
-  }));
+  const head = [...cols.map(c=>c.label), 'Remarks'];
+  const rows = data.map(r=>{
+    const cells = cols.map(c=>{
+      const v = r[c.key];
+      if(c.type==='date') return v? new Date(v).toLocaleDateString('en-IN'):'';
+      return v==null?'':String(v).replace(/<[^>]+>/g,'');
+    });
+    cells.push(joinedRemarks(r));
+    return cells;
+  });
   if(fmt==='xlsx'){
     const ws = XLSX.utils.aoa_to_sheet([head,...rows]);
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,mod.title);
@@ -1803,7 +1841,7 @@ function showEmployeeFullDetail(empId){
             <dt class="col-sm-4">Mobile</dt><dd class="col-sm-8">${esc(e.mobile||'-')}</dd>
             <dt class="col-sm-4">Seniority</dt><dd class="col-sm-8">${esc(e.seniority||'-')}</dd>
             <dt class="col-sm-4">Status</dt><dd class="col-sm-8"><span class="badge-pill b-${(e.status||'').toLowerCase().replace(/\s/g,'')}">${esc(e.status||'')}</span></dd>
-            <dt class="col-sm-4">Remarks</dt><dd class="col-sm-8">${esc(e.remarks||'-')}</dd>
+            <dt class="col-sm-4">Remarks</dt><dd class="col-sm-8">${esc(joinedRemarks(e)||'-')}</dd>
           </dl>
         </div>
       </div>
@@ -1816,7 +1854,7 @@ function showEmployeeFullDetail(empId){
         <dt class="col-sm-3">Order No. / Date</dt><dd class="col-sm-9">${esc(cp.orderNumber||'-')} · ${fmt(cp.postingDate)}</dd>
         <dt class="col-sm-3">Joining Dates</dt><dd class="col-sm-9">Office: ${fmt(cp.joiningDate)} · District: ${fmt(cp.districtJoiningDate)} · Division: ${fmt(cp.divisionJoiningDate)} · Cadre: ${fmt(cp.cadreJoiningDate)}</dd>
         <dt class="col-sm-3">Durations (cut-off ${fmt(STATE.cutoffDate||new Date())})</dt><dd class="col-sm-9">Office: ${durStr(cp.joiningDate, STATE.cutoffDate?new Date(STATE.cutoffDate):new Date())} · District: ${durStr(cp.districtJoiningDate||cp.joiningDate, STATE.cutoffDate?new Date(STATE.cutoffDate):new Date())} · Division: ${durStr(cp.divisionJoiningDate||cp.joiningDate, STATE.cutoffDate?new Date(STATE.cutoffDate):new Date())}</dd>
-        <dt class="col-sm-3">Remarks</dt><dd class="col-sm-9">${esc(cp.remarks||'-')}</dd>
+        <dt class="col-sm-3">Remarks</dt><dd class="col-sm-9">${esc(joinedRemarks(cp)||'-')}</dd>
       </dl>`:'<div class="text-muted small">No current posting (vacant)</div>'}
       <hr>
       <h6 class="mt-3">Additional Charges (${acs.length})</h6>
@@ -1907,7 +1945,7 @@ function showOfficeFullDetail(officeId){
         <dt class="col-sm-3">Additional Charges (active)</dt><dd class="col-sm-9">${o._additionalCharges||0}</dd>
         <dt class="col-sm-3">Attachments (active)</dt><dd class="col-sm-9">${o._attachments||0}</dd>
         <dt class="col-sm-3">Demand</dt><dd class="col-sm-9">${esc(o.demand||'-')}</dd>
-        <dt class="col-sm-3">Remarks</dt><dd class="col-sm-9">${esc(o.remarks||'-')}</dd>
+        <dt class="col-sm-3">Remarks</dt><dd class="col-sm-9">${esc(joinedRemarks(o)||'-')}</dd>
       </dl>
       <hr>
       <h6 class="mt-3">Posted Employees (${posted.length})</h6>
@@ -1970,10 +2008,14 @@ function buildCustomReportFields(){
   const mk = $('#cr-module').value;
   const mod = MODULES[mk];
   const fields = mod.form;
-  $('#cr-fields').innerHTML = fields.filter(f=>f.type!=='file').map(f=>`<label class="form-check"><input type="checkbox" class="form-check-input cr-field" value="${f.key}" checked> ${esc(f.label)}</label>`).join('');
+  // Collapse remark1/2/3 into a single virtual "Remarks (non-empty only)" choice
+  const isRemark = k => /^remark[123]$/.test(k);
+  const baseFields = fields.filter(f=>f.type!=='file' && !isRemark(f.key));
+  const hasRemarks = fields.some(f=>isRemark(f.key));
+  $('#cr-fields').innerHTML = baseFields.map(f=>`<label class="form-check"><input type="checkbox" class="form-check-input cr-field" value="${f.key}" checked> ${esc(f.label)}</label>`).join('') + (hasRemarks?`<label class="form-check"><input type="checkbox" class="form-check-input cr-field" value="__remarks__" checked> Remarks <small class="text-muted">(non-empty only)</small></label>`:'');
   $('#cr-date-field').innerHTML = '<option value="">— None —</option>'+fields.filter(f=>f.type==='date').map(f=>`<option value="${f.key}">${esc(f.label)}</option>`).join('');
   $('#cr-filters').innerHTML = fields.filter(f=>f.type==='select').slice(0,3).map(f=>`<div class="mb-2"><label class="form-label small">${esc(f.label)}</label><select class="form-select form-select-sm cr-filter" data-field="${f.key}"><option value="">All</option>${f.opts.map(o=>`<option>${esc(o)}</option>`).join('')}</select></div>`).join('');
-  $('#cr-sort').innerHTML = fields.filter(f=>f.type!=='file').map(f=>`<option value="${f.key}">${esc(f.label)}</option>`).join('');
+  $('#cr-sort').innerHTML = baseFields.map(f=>`<option value="${f.key}">${esc(f.label)}</option>`).join('');
 }
 function runCustomReport(){
   const mk = $('#cr-module').value;
@@ -1993,8 +2035,17 @@ function runCustomReport(){
   filters.forEach(f=>{ rows = rows.filter(r=>r[f.field]===f.val); });
   if(sort) rows.sort((a,b)=>{const x=a[sort],y=b[sort];return dir==='asc'?(x>y?1:-1):(x<y?1:-1);});
 
-  const labels = sel.map(s=>mod.form.find(f=>f.key===s)?.label||s);
-  const data = rows.map(r=>sel.map(s=>{const f=mod.form.find(x=>x.key===s);let v=r[s];if(f?.type==='date')v=fmt(v);if(f?.type==='employee')v=r.employeeName||v;if(f?.type==='office')v=r.officeName||v;if(f?.type==='checkbox')v=v?'Yes':'No';return v;}));
+  const labels = sel.map(s=>s==='__remarks__'?'Remarks':(mod.form.find(f=>f.key===s)?.label||s));
+  const data = rows.map(r=>sel.map(s=>{
+    if(s==='__remarks__') return joinedRemarks(r);
+    const f=mod.form.find(x=>x.key===s);
+    let v=r[s];
+    if(f?.type==='date')v=fmt(v);
+    if(f?.type==='employee')v=r.employeeName||v;
+    if(f?.type==='office')v=r.officeName||v;
+    if(f?.type==='checkbox')v=v?'Yes':'No';
+    return v;
+  }));
   $('#cr-output').innerHTML = `
     <div class="section-card">
       <div class="d-flex justify-content-between align-items-center mb-3">
@@ -2174,7 +2225,7 @@ function setupGlobalSearch(){
     const deptMap = Object.fromEntries((STATE.data.departments||[]).map(d=>[d.id,d.name]));
     const go = STATE.data.offices.filter(o=>{
       const dn = deptMap[o.departmentId]||o.department||'';
-      const hay = [o.name, dn, o.district, o.division, o.remarks].filter(Boolean).join(' ').toLowerCase();
+      const hay = [o.name, dn, o.district, o.division, joinedRemarks(o)].filter(Boolean).join(' ').toLowerCase();
       return hay.includes(q);
     }).slice(0,8);
     if(go.length) groups.push({title:'Offices',items:go.map(o=>({label:o.name,sub:`${o.district||''} · ${deptMap[o.departmentId]||o.department||''}`,action:()=>{navigate('offices');setTimeout(()=>viewRecord('offices',o.id),120);}}))});
@@ -2225,6 +2276,7 @@ async function runAutoRetirementCheck(){
 }
 
 function showRetirementVacatePopup(list){
+  hideLoader();
   const rows = list.map(e=>{
     const p = STATE.data.postings.find(x=>x.employeeId===e.id);
     const o = STATE.data.offices.find(x=>x.id===p?.officeId);
