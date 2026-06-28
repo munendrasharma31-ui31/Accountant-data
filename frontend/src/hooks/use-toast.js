@@ -136,7 +136,9 @@ function useToast() {
 
   React.useEffect(() => {
     // setState reference is stable across renders, so subscribing once is correct.
-    // listeners is a module-level mutable array intentionally shared across hook instances.
+    // `listeners` is a module-level mutable array intentionally shared across hook
+    // instances; `index` is computed inside the cleanup and is not a hook input.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     listeners.push(setState)
     return () => {
       const index = listeners.indexOf(setState)
@@ -144,6 +146,7 @@ function useToast() {
         listeners.splice(index, 1)
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   return {

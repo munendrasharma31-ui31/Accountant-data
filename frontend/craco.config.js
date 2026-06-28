@@ -11,6 +11,32 @@ const config = {
   enableHealthCheck: process.env.ENABLE_HEALTH_CHECK === "true",
 };
 
+// Helper: resolve `https` flag into the dev-server `server` shape.
+// `https` may be: an object (custom https options), truthy boolean, or falsy.
+function resolveServerConfig(https) {
+  if (typeof https === "object") return { type: "https", options: https };
+  if (https) return "https";
+  return "http";
+}
+
+// Helper: convert legacy onBeforeSetupMiddleware/setupMiddlewares into v5 form.
+function buildSetupMiddlewares(onBeforeSetupMiddleware, setupMiddlewares) {
+  if (!onBeforeSetupMiddleware && !setupMiddlewares) return undefined;
+  return (middlewares, devServer) => {
+    if (onBeforeSetupMiddleware) onBeforeSetupMiddleware(devServer);
+    return setupMiddlewares ? setupMiddlewares(middlewares, devServer) : middlewares;
+  };
+}
+
+// Helper: shim onListening + legacy onAfterSetupMiddleware into a single onListening.
+function buildOnListening(onListening, onAfterSetupMiddleware) {
+  return (devServer) => {
+    devServer.close ??= (callback) => devServer.stopCallback(callback);
+    if (onListening) onListening(devServer);
+    if (onAfterSetupMiddleware) onAfterSetupMiddleware(devServer);
+  };
+}
+
 function makeDevServerV5Compatible(devServerConfig) {
   const {
     https,
@@ -21,44 +47,19 @@ function makeDevServerV5Compatible(devServerConfig) {
     ...compatibleConfig
   } = devServerConfig;
 
-  // Resolve `https` config flag into the dev-server `server` shape.
-  // `https` may be: an object (custom https options), truthy boolean, or falsy.
-  let serverConfig;
-  if (typeof https === "object") {
-    serverConfig = { type: "https", options: https };
-  } else if (https) {
-    serverConfig = "https";
-  } else {
-    serverConfig = "http";
-  }
-  compatibleConfig.server = serverConfig;
+  compatibleConfig.server = resolveServerConfig(https);
   compatibleConfig.headers = {
     ...compatibleConfig.headers,
     "Cross-Origin-Resource-Policy": "same-origin",
   };
 
-  if (onBeforeSetupMiddleware || setupMiddlewares) {
-    compatibleConfig.setupMiddlewares = (middlewares, devServer) => {
-      if (onBeforeSetupMiddleware) {
-        onBeforeSetupMiddleware(devServer);
-      }
+  const wrappedSetupMiddlewares = buildSetupMiddlewares(
+    onBeforeSetupMiddleware,
+    setupMiddlewares
+  );
+  if (wrappedSetupMiddlewares) compatibleConfig.setupMiddlewares = wrappedSetupMiddlewares;
 
-      return setupMiddlewares
-        ? setupMiddlewares(middlewares, devServer)
-        : middlewares;
-    };
-  }
-
-  compatibleConfig.onListening = (devServer) => {
-    devServer.close ??= (callback) => devServer.stopCallback(callback);
-
-    if (onListening) {
-      onListening(devServer);
-    }
-    if (onAfterSetupMiddleware) {
-      onAfterSetupMiddleware(devServer);
-    }
-  };
+  compatibleConfig.onListening = buildOnListening(onListening, onAfterSetupMiddleware);
 
   return compatibleConfig;
 }
@@ -140,9 +141,13 @@ if (isDevServer) {
     webpackConfig = withVisualEdits(webpackConfig);
   } catch (err) {
     if (err.code === 'MODULE_NOT_FOUND' && err.message.includes('@emergentbase/visual-edits/craco')) {
-      console.warn(
-        "[visual-edits] @emergentbase/visual-edits not installed — visual editing disabled."
-      );
+      if (process.env.NODE_ENV !== "production") {
+        // Only surface this notice in dev — keep production logs clean.
+        // eslint-disable-next-line no-console
+        console.warn(
+          "[visual-edits] @emergentbase/visual-edits not installed — visual editing disabled."
+        );
+      }
     } else {
       throw err;
     }

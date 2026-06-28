@@ -7,17 +7,21 @@ import { HOME } from "@/constants/testIds";
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
+const isDev = process.env.NODE_ENV === "development";
+
 const Home = () => {
   useEffect(() => {
     const helloWorldApi = async () => {
       try {
         const response = await axios.get(`${API}/`);
-        console.log(response.data.message);
+        if (isDev) console.log(response.data.message);
       } catch (e) {
-        console.error(e, `errored out requesting / api`);
+        if (isDev) console.error(e, `errored out requesting / api`);
       }
     };
     helloWorldApi();
+    // API and axios are module-level constants; intentionally empty dep array to run once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
