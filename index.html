@@ -2153,7 +2153,7 @@ function openUserForm(id=null){
       <option value="editor" ${(existing.role==='editor'||existing.role==='user')?'selected':''}>Editor (add/edit, no delete, locked sanctioned)</option>
       <option value="super_admin" ${existing.role==='super_admin'?'selected':''}>Super Admin (full access)</option>
     </select></div>
-    <div class="col-md-6"><label class="form-label">${id?'Reset Password (leave blank to keep)':'Password *'}</label><input class="form-control" type="text" name="password" ${id?'':'required minlength="6"'}></div>
+    <div class="col-md-6"><label class="form-label">${id?'Reset Password (leave blank to keep)':'Password *'}</label><input class="form-control" type="password" name="password" autocomplete="new-password" ${id?'':'required minlength="6"'}></div>
     <div class="col-md-6"><label class="form-label">Phone</label><input class="form-control" name="phone" value="${esc(existing.phone||'')}"></div>
     <div class="col-md-6 d-flex align-items-end"><div class="form-check"><input class="form-check-input" type="checkbox" name="active" ${existing.active!==false?'checked':''}><label class="form-check-label">Active</label></div></div>
   </form>`;
