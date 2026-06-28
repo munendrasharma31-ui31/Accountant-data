@@ -394,10 +394,12 @@ const STATE = {
   data: {
     employees: [], postings: [], offices: [], additionalCharges: [],
     attachments: [], promotionForgo: [], retirements: [], deceased: [],
+    departments: [],
     users: [], auditLogs: [], settings: {}
   },
   unsub: [],
-  charts: {}
+  charts: {},
+  cutoffDate: null
 };
 
 /* ---------- MANDAL-JILA SEED ---------- */
@@ -407,7 +409,10 @@ const DISTRICTS = [...new Set(MANDAL_JILA.map(x=>x[1]))];
 const DISTRICT_TO_DIVISION = Object.fromEntries(MANDAL_JILA.map(([m,j])=>[j,m]));
 const CATEGORIES = ['General','OBC','SC','ST','EWS','Minority'];
 const GENDERS = ['Male','Female','Other'];
-const STATUSES = ['Working','Retired','Deceased','Promoted','Suspended','Voluntary Retirement'];
+const STATUSES = ['Working','Retired','Deceased','Promoted','Suspended','Voluntary Retirement','Terminated'];
+const SPECIAL_CATEGORIES = ['None','Physically Handicapped','PH Dependent','Ex-Servicemen'];
+const HEALTH_STATUSES = ['Normal','Critically Ill (Self)','Critically Ill (Dependent)'];
+const YESNO = ['No','Yes'];
 
 /* ---------- MENU ---------- */
 const MENU = [
@@ -417,6 +422,7 @@ const MENU = [
   {key:'employees',label:'Employees',hi:'कर्मचारी',icon:'bi-people'},
   {key:'postings',label:'Postings',hi:'पदस्थापन',icon:'bi-arrow-left-right'},
   {key:'offices',label:'Offices',hi:'कार्यालय',icon:'bi-building'},
+  {key:'departments',label:'Departments',hi:'विभाग',icon:'bi-diagram-3'},
   {key:'additionalCharges',label:'Additional Charges',hi:'अतिरिक्त प्रभार',icon:'bi-bookmark-plus'},
   {key:'attachments',label:'Attachments',hi:'सम्बद्ध',icon:'bi-link-45deg'},
   {key:'promotionForgo',label:'Promotion Forgo',hi:'पदोन्नति त्याग',icon:'bi-x-octagon'},
@@ -570,6 +576,7 @@ function attachListeners(){
     ['employees', 'employees', q=>q.orderBy('seniority','asc')],
     ['postings', 'postings'],
     ['offices', 'offices'],
+    ['departments', 'departments'],
     ['additionalCharges', 'additionalCharges'],
     ['attachments', 'attachments'],
     ['promotionForgo', 'promotionForgo'],
@@ -599,23 +606,39 @@ function onDataChange(key){
   if(STATE.active===key) renderCurrentPage();
   if(['employees','postings','offices','deceased','retirements','additionalCharges'].includes(key) && STATE.active==='dashboard') renderDashboard();
   // recalculate office stats whenever postings/employees/charges change
-  if(['postings','employees','additionalCharges','offices'].includes(key)) computeOfficeStats();
+  if(['postings','employees','additionalCharges','offices','attachments','departments'].includes(key)) computeOfficeStats();
 }
 
-/* ---------- DERIVED: office stats ---------- */
+/* ---------- DERIVED: office + department stats ---------- */
 function computeOfficeStats(){
   const offices = STATE.data.offices;
   const postings = STATE.data.postings;
   const emps = STATE.data.employees;
   const charges = STATE.data.additionalCharges;
+  const attachments = STATE.data.attachments;
+  const departments = STATE.data.departments || [];
   const empById = Object.fromEntries(emps.map(e=>[e.id, e]));
+  const deptById = Object.fromEntries(departments.map(d=>[d.id, d]));
   offices.forEach(o=>{
-    // Filled = active employees with current posting in this office
-    const filled = postings.filter(p=> p.current && p.officeId === o.id && empById[p.employeeId] && empById[p.employeeId].status === 'Working').length;
+    // Since only current posting is kept, every posting is current
+    const filled = postings.filter(p=> p.officeId === o.id && empById[p.employeeId] && empById[p.employeeId].status === 'Working').length;
     const ac = charges.filter(c=> c.officeId === o.id && c.status==='Active').length;
+    const at = attachments.filter(a=> a.attachedOfficeId === o.id && a.status==='Active').length;
     o._filled = filled;
     o._vacant = Math.max(0, (parseInt(o.sanctioned||0)) - filled);
     o._additionalCharges = ac;
+    o._attachments = at;
+    o.departmentName = deptById[o.departmentId]?.name || o.department || '';
+  });
+  // Department stats from offices
+  departments.forEach(d=>{
+    const offs = offices.filter(o=>o.departmentId===d.id);
+    d._offices = offs.length;
+    d._sanctioned = offs.reduce((s,o)=>s+parseInt(o.sanctioned||0),0);
+    d._filled = offs.reduce((s,o)=>s+(o._filled||0),0);
+    d._vacant = Math.max(0, d._sanctioned - d._filled);
+    d._additionalCharges = offs.reduce((s,o)=>s+(o._additionalCharges||0),0);
+    d._attachments = offs.reduce((s,o)=>s+(o._attachments||0),0);
   });
 }
 
@@ -772,6 +795,7 @@ function renderCurrentPage(){
     promotionForgo: ()=>renderListPage('promotionForgo'),
     retirements: ()=>renderListPage('retirements'),
     deceased: ()=>renderListPage('deceased'),
+    departments: ()=>renderListPage('departments'),
     reports: renderReports,
     customReports: renderCustomReports,
     users: renderUsers,
@@ -794,16 +818,20 @@ const MODULES = {
       {key:'retirementDate',label:'Retirement',render:fmt,type:'date'},
       {key:'homeDistrict',label:'Home District',hi:'गृह जनपद'},
       {key:'category',label:'Category'},
+      {key:'specialCategory',label:'Special',render:v=>v&&v!=='None'?`<span class="badge-pill b-promoted">${esc(v)}</span>`:''},
+      {key:'healthStatus',label:'Health',render:v=>v&&v!=='Normal'?`<span class="badge-pill b-deceased">${esc(v)}</span>`:''},
       {key:'mobile',label:'Mobile'},
       {key:'seniority',label:'Seniority'},
       {key:'status',label:'Status',render:v=>`<span class="badge-pill b-${(v||'').toLowerCase().replace(/\s/g,'')}">${esc(v||'')}</span>`}
     ],
     form:[
-      {key:'manavSampadaId',label:'Manav Sampada ID',hi:'मानव सम्पदा आई0डी0',req:true},
+      {key:'manavSampadaId',label:'Manav Sampada ID (EHRMS)',hi:'मानव सम्पदा आई0डी0',req:true},
       {key:'name',label:'Employee Name',hi:'कर्मचारी का नाम',req:true},
       {key:'fatherName',label:'Father Name',hi:'पिता का नाम'},
-      {key:'gender',label:'Gender',type:'select',opts:GENDERS},
-      {key:'category',label:'Category',type:'select',opts:CATEGORIES},
+      {key:'gender',label:'Gender',hi:'लिंग',type:'select',opts:GENDERS},
+      {key:'category',label:'Category',hi:'श्रेणी',type:'select',opts:CATEGORIES},
+      {key:'specialCategory',label:'Special Category',hi:'विशेष श्रेणी',type:'select',opts:SPECIAL_CATEGORIES,default:'None'},
+      {key:'healthStatus',label:'Health Status',hi:'स्वास्थ्य स्थिति',type:'select',opts:HEALTH_STATUSES,default:'Normal'},
       {key:'mobile',label:'Mobile Number',type:'tel'},
       {key:'dob',label:'Date of Birth',type:'date',req:true,onChange:'autoRetirement'},
       {key:'dateOfJoining',label:'Date of Joining',type:'date'},
@@ -817,30 +845,31 @@ const MODULES = {
     ]
   },
   postings: {
-    title:'Postings', hi:'पदस्थापन', collection:'postings',
+    title:'Postings', hi:'पदस्थापन (केवल वर्तमान)', collection:'postings',
     columns:[
       {key:'employeeName',label:'Employee'},
-      {key:'manavSampadaId',label:'Manav ID'},
+      {key:'manavSampadaId',label:'EHRMS / Manav ID'},
       {key:'division',label:'Division'},
       {key:'district',label:'District'},
-      {key:'officeName',label:'Office'},
+      {key:'officeName',label:'Current Office'},
       {key:'orderNumber',label:'Order No.'},
       {key:'postingDate',label:'Posting Date',render:fmt},
       {key:'joiningDate',label:'Joining',render:fmt},
-      {key:'relievingDate',label:'Relieving',render:fmt},
-      {key:'current',label:'Current',render:v=>v?'<span class="badge-pill b-working">Active</span>':'<span class="badge-pill b-inactive">Closed</span>'}
+      {key:'_durOffice',label:'Duration (Office)',render:v=>esc(v||'')},
+      {key:'_durDistrict',label:'Duration (District)',render:v=>esc(v||'')},
+      {key:'_durDivision',label:'Duration (Division)',render:v=>esc(v||'')}
     ],
     form:[
-      {key:'employeeId',label:'Employee',type:'employee',req:true},
+      {key:'employeeId',label:'Employee',type:'employee',req:true,onChange:'syncEmployeeCadreJoin'},
       {key:'division',label:'Division',type:'select',opts:DIVISIONS,req:true,onChange:'filterDistrictsByDivision'},
       {key:'district',label:'District',type:'select',opts:DISTRICTS,req:true,onChange:'filterOfficesByDistrict'},
-      {key:'department',label:'Department'},
       {key:'officeId',label:'Office',type:'office',req:true},
       {key:'orderNumber',label:'Posting Order Number'},
-      {key:'postingDate',label:'Posting Date',type:'date'},
-      {key:'joiningDate',label:'Joining Date',type:'date',req:true},
-      {key:'relievingDate',label:'Relieving Date',type:'date'},
-      {key:'current',label:'Current Posting',type:'checkbox',default:true},
+      {key:'postingDate',label:'Posting Order Date',type:'date'},
+      {key:'joiningDate',label:'Office Joining Date',hi:'कार्यालय में कार्यभार ग्रहण की तिथि',type:'date',req:true},
+      {key:'districtJoiningDate',label:'District Joining Date',hi:'जनपद में कार्यभार ग्रहण की तिथि',type:'date'},
+      {key:'divisionJoiningDate',label:'Division Joining Date',hi:'मण्डल में कार्यभार ग्रहण की तिथि',type:'date'},
+      {key:'cadreJoiningDate',label:'Cadre Joining Date',hi:'लेखाकार पद पर कार्यभार ग्रहण की तिथि',type:'date'},
       {key:'remarks',label:'Remarks',type:'textarea',full:true}
     ]
   },
@@ -848,17 +877,18 @@ const MODULES = {
     title:'Offices', hi:'कार्यालय', collection:'offices',
     columns:[
       {key:'name',label:'Office Name'},
-      {key:'department',label:'Department'},
+      {key:'departmentName',label:'Department'},
       {key:'district',label:'District'},
       {key:'division',label:'Division'},
       {key:'sanctioned',label:'Sanctioned',type:'number'},
       {key:'_filled',label:'Filled (auto)',render:v=>esc(v||0)},
       {key:'_vacant',label:'Vacant (auto)',render:v=>`<span style="font-weight:600;color:${v>0?'var(--bad)':'var(--ok)'}">${esc(v||0)}</span>`},
-      {key:'_additionalCharges',label:'Add. Charges',render:v=>esc(v||0)}
+      {key:'_additionalCharges',label:'Add. Charges',render:v=>esc(v||0)},
+      {key:'_attachments',label:'Attachments',render:v=>esc(v||0)}
     ],
     form:[
       {key:'name',label:'Office Name',hi:'कार्यालय का नाम',req:true,full:true},
-      {key:'department',label:'Department',hi:'विभाग का नाम',req:true,full:true},
+      {key:'departmentId',label:'Department',hi:'विभाग का नाम',type:'department',req:true,full:true},
       {key:'district',label:'District',type:'select',opts:DISTRICTS,req:true,onChange:'syncDivision'},
       {key:'division',label:'Division',type:'select',opts:DIVISIONS,req:true},
       {key:'sanctioned',label:'Sanctioned Posts',type:'number',req:true},
@@ -870,8 +900,9 @@ const MODULES = {
     title:'Additional Charges', hi:'अतिरिक्त प्रभार', collection:'additionalCharges',
     columns:[
       {key:'employeeName',label:'Employee'},
-      {key:'manavSampadaId',label:'Manav ID'},
-      {key:'district',label:'District'},
+      {key:'manavSampadaId',label:'EHRMS'},
+      {key:'parentOfficeName',label:'Current Posting Office',render:v=>esc(v||'-')},
+      {key:'district',label:'A/C District'},
       {key:'officeName',label:'Additional Office'},
       {key:'orderNumber',label:'Order No.'},
       {key:'effectiveDate',label:'Effective',render:fmt},
@@ -879,7 +910,9 @@ const MODULES = {
       {key:'status',label:'Status',render:v=>`<span class="badge-pill ${v==='Active'?'b-working':'b-inactive'}">${esc(v||'')}</span>`}
     ],
     form:[
-      {key:'employeeId',label:'Employee',type:'employee',req:true},
+      {key:'employeeId',label:'Employee (type EHRMS/Name)',type:'employee',req:true,onChange:'autoFillParentOffice'},
+      {key:'parentOfficeId',label:'Current Posting Office (auto)',type:'office',readonly:true},
+      {key:'parentDistrict',label:'Current Posting District (auto)',readonly:true},
       {key:'district',label:'Additional Charge District',type:'select',opts:DISTRICTS,req:true,onChange:'filterOfficesByDistrict'},
       {key:'officeId',label:'Additional Charge Office',type:'office',req:true},
       {key:'orderNumber',label:'Order Number & Date',req:true},
@@ -969,6 +1002,23 @@ const MODULES = {
       {key:'orderDate',label:'Death Order Date',type:'date'},
       {key:'remarks',label:'Remarks',type:'textarea',full:true}
     ]
+  },
+  departments: {
+    title:'Departments', hi:'विभाग', collection:'departments',
+    columns:[
+      {key:'name',label:'Department Name',hi:'विभाग का नाम'},
+      {key:'_sanctioned',label:'Sanctioned (auto)',render:v=>esc(v||0)},
+      {key:'_filled',label:'Filled (auto)',render:v=>esc(v||0)},
+      {key:'_vacant',label:'Vacant (auto)',render:v=>`<span style="font-weight:600;color:${v>0?'var(--bad)':'var(--ok)'}">${esc(v||0)}</span>`},
+      {key:'_additionalCharges',label:'Add. Charges',render:v=>esc(v||0)},
+      {key:'_attachments',label:'Attachments',render:v=>esc(v||0)},
+      {key:'_offices',label:'Offices',render:v=>esc(v||0)}
+    ],
+    form:[
+      {key:'name',label:'Department Name',hi:'विभाग का नाम',req:true,full:true},
+      {key:'shortName',label:'Short Name / Abbreviation'},
+      {key:'remarks',label:'Remarks',type:'textarea',full:true}
+    ]
   }
 };
 
@@ -984,7 +1034,8 @@ function renderListPage(modKey){
         <h1>${mod.title} <span class="devanagari" style="font-size:18px;color:var(--muted);font-weight:500"> · ${mod.hi}</span></h1>
         <div class="sub">${STATE.data[modKey].length} record(s) · Live updates from Firestore</div>
       </div>
-      <div class="d-flex gap-2 flex-wrap">
+      <div class="d-flex gap-2 flex-wrap align-items-center">
+        ${modKey==='postings'?`<div class="input-group input-group-sm" style="width:auto"><span class="input-group-text"><i class="bi bi-calendar-range"></i> Cut-off</span><input type="date" class="form-control" id="cutoff-date" value="${STATE.cutoffDate||fmtISO(new Date())}" data-testid="cutoff-date-input" onchange="setCutoffDate(this.value)"></div>`:''}
         ${allowAdd?`<button class="btn btn-primary" onclick="openForm('${modKey}')" data-testid="add-${modKey}-btn"><i class="bi bi-plus-lg"></i> Add</button>`:''}
         ${allowAdd?`<button class="btn btn-outline-primary" onclick="openBulkImport('${modKey}')" data-testid="bulk-import-${modKey}"><i class="bi bi-upload"></i> Bulk Import</button>`:''}
         <button class="btn btn-outline-primary" onclick="exportModule('${modKey}','xlsx')"><i class="bi bi-file-earmark-excel"></i> Excel</button>
@@ -1030,6 +1081,8 @@ function renderTable(modKey){
 function enrichRows(modKey, rows){
   const empMap = Object.fromEntries(STATE.data.employees.map(e=>[e.id,e]));
   const offMap = Object.fromEntries(STATE.data.offices.map(o=>[o.id,o]));
+  const deptMap = Object.fromEntries((STATE.data.departments||[]).map(d=>[d.id,d]));
+  const cutoff = STATE.cutoffDate ? new Date(STATE.cutoffDate) : new Date();
   return rows.map(r=>{
     const o = {...r};
     if(r.employeeId && empMap[r.employeeId]){
@@ -1039,8 +1092,27 @@ function enrichRows(modKey, rows){
     if(r.officeId && offMap[r.officeId]) o.officeName = offMap[r.officeId].name;
     if(r.parentOfficeId && offMap[r.parentOfficeId]) o.parentOfficeName = offMap[r.parentOfficeId].name;
     if(r.attachedOfficeId && offMap[r.attachedOfficeId]) o.attachedOfficeName = offMap[r.attachedOfficeId].name;
+    if(r.departmentId && deptMap[r.departmentId]) o.departmentName = deptMap[r.departmentId].name;
+    if(modKey==='postings'){
+      o._durOffice = durStr(r.joiningDate, cutoff);
+      o._durDistrict = durStr(r.districtJoiningDate || r.joiningDate, cutoff);
+      o._durDivision = durStr(r.divisionJoiningDate || r.joiningDate, cutoff);
+    }
     return o;
   });
+}
+function durStr(from, to){
+  if(!from) return '';
+  const a = typeof from==='string'?new Date(from):from;
+  if(isNaN(a)) return '';
+  const b = typeof to==='string'?new Date(to):to;
+  let years = b.getFullYear()-a.getFullYear();
+  let months = b.getMonth()-a.getMonth();
+  let days = b.getDate()-a.getDate();
+  if(days<0){ months--; const prevMonth = new Date(b.getFullYear(),b.getMonth(),0); days+=prevMonth.getDate(); }
+  if(months<0){ years--; months+=12; }
+  if(years<0) return '';
+  return `${years}y ${months}m ${days}d`;
 }
 
 /* ---------- FORM (Add/Edit) ---------- */
@@ -1078,12 +1150,16 @@ function renderFormField(f, existing){
     return `<div class="${col}">${lab}<select class="form-select" name="${f.key}" ${req}><option value="">— Select —</option>${f.opts.map(o=>`<option value="${esc(o)}" ${o===val?'selected':''}>${esc(o)}</option>`).join('')}</select></div>`;
   }
   if(f.type==='employee'){
-    const opts = STATE.data.employees.map(e=>`<option value="${esc(e.id)}" ${e.id===val?'selected':''}>${esc(e.name)} (${esc(e.manavSampadaId||'')})</option>`).join('');
-    return `<div class="${col}">${lab}<select class="form-select" name="${f.key}" ${req}><option value="">— Select Employee —</option>${opts}</select></div>`;
+    const opts = STATE.data.employees.map(e=>`<option value="${esc(e.id)}" data-mid="${esc(e.manavSampadaId||'')}" ${e.id===val?'selected':''}>${esc(e.name)} (${esc(e.manavSampadaId||'')})</option>`).join('');
+    return `<div class="${col}">${lab}<select class="form-select" name="${f.key}" ${req}><option value="">— Select Employee —</option>${opts}</select><small class="text-muted">Type EHRMS / Name to filter (browser native search)</small></div>`;
   }
   if(f.type==='office'){
     const opts = STATE.data.offices.map(o=>`<option value="${esc(o.id)}" data-district="${esc(o.district)}" ${o.id===val?'selected':''}>${esc(o.name)} — ${esc(o.district||'')}</option>`).join('');
-    return `<div class="${col}">${lab}<select class="form-select" name="${f.key}" ${req}><option value="">— Select Office —</option>${opts}</select></div>`;
+    return `<div class="${col}">${lab}<select class="form-select" name="${f.key}" ${req} ${ro?'disabled':''}><option value="">— Select Office —</option>${opts}</select></div>`;
+  }
+  if(f.type==='department'){
+    const opts = (STATE.data.departments||[]).map(d=>`<option value="${esc(d.id)}" ${d.id===val?'selected':''}>${esc(d.name)}</option>`).join('');
+    return `<div class="${col}">${lab}<select class="form-select" name="${f.key}" ${req}><option value="">— Select Department —</option>${opts}</select></div>`;
   }
   if(f.type==='textarea'){
     return `<div class="${col}">${lab}<textarea class="form-control" name="${f.key}" rows="2" ${ro}>${esc(val||'')}</textarea></div>`;
@@ -1124,6 +1200,34 @@ function handleFieldChange(action, srcKey){
     const list = STATE.data.offices.filter(o=> !dist || o.district === dist);
     sel.innerHTML = '<option value="">— Select Office —</option>'+list.map(o=>`<option value="${esc(o.id)}" ${o.id===cur?'selected':''}>${esc(o.name)}</option>`).join('');
   }
+  if(action==='autoFillParentOffice'){
+    const empId = $('[name="employeeId"]').value;
+    if(!empId) return;
+    const currentPosting = STATE.data.postings.find(p=>p.employeeId===empId);
+    const pOff = $('[name="parentOfficeId"]');
+    const pDist = $('[name="parentDistrict"]');
+    if(currentPosting){
+      const o = STATE.data.offices.find(x=>x.id===currentPosting.officeId);
+      if(pOff) pOff.value = currentPosting.officeId || '';
+      if(pDist) pDist.value = o?.district || currentPosting.district || '';
+    } else {
+      if(pOff) pOff.value = '';
+      if(pDist) pDist.value = '';
+    }
+  }
+  if(action==='syncEmployeeCadreJoin'){
+    const empId = $('[name="employeeId"]').value;
+    if(!empId) return;
+    const emp = STATE.data.employees.find(x=>x.id===empId);
+    if(emp && emp.dateOfJoining){
+      const cj = $('[name="cadreJoiningDate"]');
+      if(cj && !cj.value) cj.value = emp.dateOfJoining;
+    }
+  }
+}
+function setCutoffDate(v){
+  STATE.cutoffDate = v || null;
+  if(STATE.active==='postings') renderListPage('postings');
 }
 
 async function saveRecord(){
@@ -1158,17 +1262,47 @@ async function saveRecord(){
   // for postings, derive office details
   if(modKey==='postings' && data.officeId){
     const o = STATE.data.offices.find(x=>x.id===data.officeId);
-    if(o){ data.district = data.district || o.district; data.division = data.division || o.division; data.department = data.department || o.department; }
+    if(o){ data.district = data.district || o.district; data.division = data.division || o.division; data.departmentId = data.departmentId || o.departmentId; }
+  }
+  // for additionalCharges, capture parent office snapshot
+  if(modKey==='additionalCharges' && data.employeeId){
+    const cp = STATE.data.postings.find(p=>p.employeeId===data.employeeId);
+    if(cp){
+      data.parentOfficeId = data.parentOfficeId || cp.officeId;
+      const o = STATE.data.offices.find(x=>x.id===cp.officeId);
+      data.parentDistrict = data.parentDistrict || (o?.district || cp.district);
+      data.parentOfficeName = o?.name || '';
+    }
+  }
+  // Posting vacancy guard: check active charges/attachments in target office
+  if(modKey==='postings' && data.officeId){
+    const blockingAC = STATE.data.additionalCharges.filter(c=>c.officeId===data.officeId && c.status==='Active');
+    const blockingAT = STATE.data.attachments.filter(a=>a.attachedOfficeId===data.officeId && a.status==='Active');
+    if(blockingAC.length || blockingAT.length){
+      const remark = await postingConflictPrompt(blockingAC, blockingAT);
+      if(remark === null){ hideLoader(); return; } // cancelled
+      if(remark.removeBlocking){
+        data._pendingBlockingRemove = {ac:blockingAC.map(x=>x.id), at:blockingAT.map(x=>x.id), remark:remark.text};
+      } else {
+        data.conflictRemark = remark.text || '';
+      }
+    }
   }
   data.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
   if(!id) data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+  // For postings: enforce only one record per employee (current only) - upsert by employeeId
+  if(modKey==='postings' && !id && data.employeeId){
+    const existing = STATE.data.postings.find(p=>p.employeeId===data.employeeId);
+    if(existing){ currentEdit.id = existing.id; }
+  }
+  const realId = currentEdit.id;
   showLoader();
   try{
-    let recId = id;
-    const old = id ? STATE.data[modKey].find(x=>x.id===id) : null;
-    if(id) await db.collection(mod.collection).doc(id).update(data);
+    let recId = realId;
+    const old = realId ? STATE.data[modKey].find(x=>x.id===realId) : null;
+    if(realId) await db.collection(mod.collection).doc(realId).update(data);
     else { const ref = await db.collection(mod.collection).add(data); recId = ref.id; }
-    await audit(id?'Update':'Create', modKey, recId, old, data);
+    await audit(realId?'Update':'Create', modKey, recId, old, data);
     // Business rules
     await applyBusinessRules(modKey, recId, data, old);
     toast('Saved successfully','ok');
@@ -1178,19 +1312,62 @@ async function saveRecord(){
   } finally { hideLoader(); }
 }
 
+/* Prompt for posting conflict (active AC/attachment in target office) */
+function postingConflictPrompt(acs, ats){
+  return new Promise(res=>{
+    const list = [
+      ...acs.map(c=>`<li>Additional Charge: ${esc(STATE.data.employees.find(e=>e.id===c.employeeId)?.name||c.employeeId)} (${esc(c.orderNumber||'')})</li>`),
+      ...ats.map(a=>`<li>Attachment: ${esc(STATE.data.employees.find(e=>e.id===a.employeeId)?.name||a.employeeId)} (${esc(a.orderNumber||'')})</li>`)
+    ].join('');
+    const modalHtml = `<div class="modal fade" id="conflict-modal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+      <div class="modal-header bg-warning"><h5 class="modal-title text-dark"><i class="bi bi-exclamation-triangle"></i> Office has active Additional Charge / Attachment</h5></div>
+      <div class="modal-body">
+        <p>The target office has the following active assignments:</p>
+        <ul>${list}</ul>
+        <p>Do you want to <b>remove</b> them (cancel/end) before saving this posting?</p>
+        <label class="form-label">Remark <span class="text-danger">*</span></label>
+        <textarea id="conflict-remark" class="form-control" rows="2" placeholder="Order number / reason for change"></textarea>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-light" id="conflict-cancel">Cancel save</button>
+        <button class="btn btn-outline-secondary" id="conflict-keep">Keep them (just save with remark)</button>
+        <button class="btn btn-danger" id="conflict-remove" data-testid="conflict-remove-btn">Yes, remove & save</button>
+      </div>
+    </div></div></div>`;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    const el = document.getElementById('conflict-modal');
+    const m = new bootstrap.Modal(el);
+    const cleanup = ()=>{ m.hide(); setTimeout(()=>el.remove(),400); };
+    document.getElementById('conflict-cancel').onclick = ()=>{ cleanup(); res(null); };
+    document.getElementById('conflict-keep').onclick = ()=>{ const t=document.getElementById('conflict-remark').value; if(!t){toast('Remark required','warn');return;} cleanup(); res({removeBlocking:false,text:t}); };
+    document.getElementById('conflict-remove').onclick = ()=>{ const t=document.getElementById('conflict-remark').value; if(!t){toast('Remark required','warn');return;} cleanup(); res({removeBlocking:true,text:t}); };
+    m.show();
+  });
+}
+
 /* ---------- BUSINESS RULES ENGINE ---------- */
 async function applyBusinessRules(modKey, recId, newData, oldData){
   const batch = db.batch();
   let dirty = false;
+  // Resolve conflict (active AC/Attachment) removal that was queued during posting save
+  if(modKey==='postings' && newData._pendingBlockingRemove){
+    const pr = newData._pendingBlockingRemove;
+    pr.ac.forEach(id=>{ batch.update(db.collection('additionalCharges').doc(id),{status:'Cancelled', cancellationDate:fmtISO(new Date()), cancellationRemark:pr.remark}); dirty=true; });
+    pr.at.forEach(id=>{ batch.update(db.collection('attachments').doc(id),{status:'Ended', endDate:fmtISO(new Date()), endRemark:pr.remark}); dirty=true; });
+    // Clean the marker field
+    batch.update(db.collection('postings').doc(recId),{_pendingBlockingRemove: firebase.firestore.FieldValue.delete()});
+  }
   if(modKey==='deceased'){
-    // mark employee Deceased + close postings + cancel active additional charges
     const empId = newData.employeeId;
     if(empId){
       batch.update(db.collection('employees').doc(empId), {status:'Deceased', deathDate: newData.deathDate, updatedAt: firebase.firestore.FieldValue.serverTimestamp()}); dirty=true;
-      const ap = STATE.data.postings.filter(p=>p.employeeId===empId && p.current);
-      ap.forEach(p=>{ batch.update(db.collection('postings').doc(p.id),{current:false, relievingDate:newData.deathDate}); });
       const ac = STATE.data.additionalCharges.filter(c=>c.employeeId===empId && c.status==='Active');
       ac.forEach(c=>{ batch.update(db.collection('additionalCharges').doc(c.id),{status:'Cancelled', cancellationDate:newData.deathDate}); });
+      const at = STATE.data.attachments.filter(a=>a.employeeId===empId && a.status==='Active');
+      at.forEach(a=>{ batch.update(db.collection('attachments').doc(a.id),{status:'Ended', endDate:newData.deathDate}); });
+      if(dirty){ await batch.commit(); dirty=false; }
+      await promptVacatePost(empId,'Death');
+      return;
     }
   }
   if(modKey==='retirements'){
@@ -1198,21 +1375,58 @@ async function applyBusinessRules(modKey, recId, newData, oldData){
     if(empId){
       const st = newData.type==='Voluntary Retirement' ? 'Voluntary Retirement' : 'Retired';
       batch.update(db.collection('employees').doc(empId), {status:st, retirementActualDate:newData.retirementDate}); dirty=true;
-      const ap = STATE.data.postings.filter(p=>p.employeeId===empId && p.current);
-      ap.forEach(p=>{ batch.update(db.collection('postings').doc(p.id),{current:false, relievingDate:newData.retirementDate}); });
       const ac = STATE.data.additionalCharges.filter(c=>c.employeeId===empId && c.status==='Active');
       ac.forEach(c=>{ batch.update(db.collection('additionalCharges').doc(c.id),{status:'Cancelled', cancellationDate:newData.retirementDate}); });
+      const at = STATE.data.attachments.filter(a=>a.employeeId===empId && a.status==='Active');
+      at.forEach(a=>{ batch.update(db.collection('attachments').doc(a.id),{status:'Ended', endDate:newData.retirementDate}); });
+      if(dirty){ await batch.commit(); dirty=false; }
+      await promptVacatePost(empId, newData.type||'Retirement');
+      return;
     }
   }
-  if(modKey==='postings' && newData.current){
-    // close other postings for same employee
-    const empId = newData.employeeId;
-    if(empId){
-      const others = STATE.data.postings.filter(p=>p.employeeId===empId && p.id!==recId && p.current);
-      others.forEach(p=>{ batch.update(db.collection('postings').doc(p.id),{current:false, relievingDate:newData.joiningDate||fmtISO(new Date())}); dirty=true; });
+  // If employee status changed to Terminated/Deceased/Retired/VRS via direct edit
+  if(modKey==='employees' && oldData && newData.status && newData.status!==oldData.status){
+    if(['Terminated','Deceased','Retired','Voluntary Retirement'].includes(newData.status)){
+      const ac = STATE.data.additionalCharges.filter(c=>c.employeeId===recId && c.status==='Active');
+      ac.forEach(c=>{ batch.update(db.collection('additionalCharges').doc(c.id),{status:'Cancelled', cancellationDate:fmtISO(new Date())}); dirty=true; });
+      if(dirty){ await batch.commit(); dirty=false; }
+      await promptVacatePost(recId, newData.status);
+      return;
     }
   }
   if(dirty){ try{ await batch.commit(); }catch(e){ console.warn(e); } }
+}
+
+/* Prompt to vacate (delete) the current posting after death/VRS/terminate */
+async function promptVacatePost(empId, reason){
+  const p = STATE.data.postings.find(x=>x.employeeId===empId);
+  if(!p) return;
+  const emp = STATE.data.employees.find(x=>x.id===empId);
+  const ok = await new Promise(res=>{
+    const html = `<div class="modal fade" id="vac-modal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+      <div class="modal-header bg-warning"><h5 class="modal-title text-dark"><i class="bi bi-exclamation-octagon"></i> Vacate the post?</h5></div>
+      <div class="modal-body">
+        <p><b>${esc(emp?.name||'')}</b> has been marked <b>${esc(reason)}</b>.</p>
+        <p>Do you want to make their current post <b>vacant</b> (remove the posting record)?<br>
+        Office: <b>${esc(STATE.data.offices.find(o=>o.id===p.officeId)?.name||'')}</b></p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-light" id="vac-no" data-testid="vacate-no-btn">No, keep it</button>
+        <button class="btn btn-danger" id="vac-yes" data-testid="vacate-yes-btn">Yes, vacate post</button>
+      </div>
+    </div></div></div>`;
+    document.body.insertAdjacentHTML('beforeend',html);
+    const el=document.getElementById('vac-modal'); const m=new bootstrap.Modal(el);
+    const cleanup=()=>{m.hide();setTimeout(()=>el.remove(),400);};
+    document.getElementById('vac-no').onclick=()=>{cleanup();res(false);};
+    document.getElementById('vac-yes').onclick=()=>{cleanup();res(true);};
+    m.show();
+  });
+  if(ok){
+    await db.collection('postings').doc(p.id).delete();
+    await audit('Vacate Post','postings',p.id,p,{reason});
+    toast('Post vacated','ok');
+  }
 }
 
 /* ---------- VIEW RECORD ---------- */
@@ -1273,12 +1487,18 @@ async function deleteRecord(modKey,id){
 }
 function checkIntegrity(modKey,id){
   if(modKey==='offices'){
-    const has = STATE.data.postings.some(p=>p.officeId===id && p.current);
+    const has = STATE.data.postings.some(p=>p.officeId===id);
     if(has) return 'Office has active postings. Cannot delete.';
+    const dep = STATE.data.additionalCharges.some(c=>c.officeId===id && c.status==='Active');
+    if(dep) return 'Office has active additional charges. Cancel them first.';
   }
   if(modKey==='employees'){
     const has = STATE.data.postings.some(p=>p.employeeId===id);
-    if(has) return 'Employee has service history. Use status change instead.';
+    if(has) return 'Employee has a current posting. Vacate the post first.';
+  }
+  if(modKey==='departments'){
+    const has = STATE.data.offices.some(o=>o.departmentId===id);
+    if(has) return 'Department has linked offices. Reassign them first.';
   }
   return null;
 }
@@ -1380,6 +1600,8 @@ function exportModule(modKey, fmt='xlsx'){
 /* ---------- REPORTS ---------- */
 function renderReports(){
   const reports = [
+    {key:'employeeSearch',name:'Karmchari Search · कर्मचारी खोज',desc:'Type EHRMS or name part → click → full multi-module detail',special:'employeeSearch'},
+    {key:'officeSearch',name:'Karyalay Search · कार्यालय खोज',desc:'Pick district → search office → click → full multi-module detail',special:'officeSearch'},
     {key:'employeeList',name:'Employee List',desc:'All employees with current posting'},
     {key:'districtWise',name:'District-wise Employee Report',desc:'Employees grouped by current district'},
     {key:'officeWise',name:'Office-wise Employee Report',desc:'Headcount by office with vacancy'},
@@ -1399,6 +1621,8 @@ function renderReports(){
   `;
 }
 function runReport(key){
+  if(key==='employeeSearch'){ return renderEmployeeSearch(); }
+  if(key==='officeSearch'){ return renderOfficeSearch(); }
   let data=[], cols=[], title='';
   computeOfficeStats();
   const empByDist = (d)=>STATE.data.employees.filter(e=>e.currentDistrict===d);
@@ -1498,6 +1722,195 @@ function downloadCustomReport(cols,rows,fmt,title){
     doc.autoTable({startY:24,head:[cols],body:rows,styles:{fontSize:7},headStyles:{fillColor:[11,61,46]}});
     doc.save(`${title}-${Date.now()}.pdf`);
   }
+}
+
+/* ---------- EMPLOYEE / OFFICE SEARCH (Karmchari/Karyalay Search) ---------- */
+function renderEmployeeSearch(){
+  $('#main-view').innerHTML = `
+    <div class="page-head"><div><h1>Karmchari Search · कर्मचारी खोज</h1><div class="sub">Type any part of EHRMS / Name / Mobile / Father / District</div></div>
+      <button class="btn btn-outline-secondary" onclick="navigate('reports')"><i class="bi bi-arrow-left"></i> Back to Reports</button>
+    </div>
+    <div class="section-card">
+      <input id="emp-search-input" class="form-control form-control-lg" placeholder="Type to search employees…" data-testid="emp-search-input" autofocus>
+      <div id="emp-search-results" class="mt-3"></div>
+    </div>
+    <div id="emp-full-detail"></div>
+  `;
+  const inp = $('#emp-search-input');
+  const render = ()=>{
+    const q = inp.value.trim().toLowerCase();
+    const out = $('#emp-search-results');
+    if(!q){ out.innerHTML=''; return; }
+    const matches = STATE.data.employees.filter(e=>{
+      const hay = [e.name,e.manavSampadaId,e.mobile,e.fatherName,e.homeDistrict,e.currentDistrict,e.category,e.specialCategory,e.healthStatus,e.status,e.seniority].filter(Boolean).join(' ').toLowerCase();
+      return hay.includes(q);
+    }).slice(0,30);
+    if(!matches.length){ out.innerHTML='<div class="text-muted small">No matches</div>'; return; }
+    out.innerHTML = `<div class="list-group">${matches.map(e=>`<button class="list-group-item list-group-item-action" data-testid="emp-result-${esc(e.id)}" onclick="showEmployeeFullDetail('${esc(e.id)}')">
+      <div class="d-flex justify-content-between">
+        <div><b>${esc(e.name)}</b> <span class="text-muted small">· EHRMS ${esc(e.manavSampadaId||'-')}</span></div>
+        <span class="badge-pill b-${(e.status||'').toLowerCase().replace(/\s/g,'')}">${esc(e.status||'')}</span>
+      </div>
+      <div class="small text-muted">${esc(e.currentDistrict||'')} · ${esc(e.category||'')} · ${esc(e.mobile||'')}</div>
+    </button>`).join('')}</div>`;
+  };
+  inp.addEventListener('input', render);
+}
+function showEmployeeFullDetail(empId){
+  const e = STATE.data.employees.find(x=>x.id===empId);
+  if(!e) return;
+  const ret = e.retirementDate? new Date(e.retirementDate): calcRetirement(e.dob);
+  const cp = STATE.data.postings.find(p=>p.employeeId===empId);
+  const cpOff = cp? STATE.data.offices.find(o=>o.id===cp.officeId): null;
+  const cpDept = cpOff? (STATE.data.departments||[]).find(d=>d.id===cpOff.departmentId): null;
+  const acs = STATE.data.additionalCharges.filter(c=>c.employeeId===empId);
+  const ats = STATE.data.attachments.filter(a=>a.employeeId===empId);
+  const pfs = STATE.data.promotionForgo.filter(p=>p.employeeId===empId);
+  const rets = STATE.data.retirements.filter(r=>r.employeeId===empId);
+  const dths = STATE.data.deceased.filter(d=>d.employeeId===empId);
+  const offMap = Object.fromEntries(STATE.data.offices.map(o=>[o.id,o.name]));
+  const dt = (rows, headers, mapper) => rows.length? `<table class="table table-sm"><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.map(mapper).join('')}</tbody></table>` : '<div class="text-muted small">No records</div>';
+  $('#emp-full-detail').innerHTML = `
+    <div class="section-card mt-3">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="mb-0">${esc(e.name)} <small class="text-muted">· EHRMS ${esc(e.manavSampadaId||'-')}</small></h4>
+        <div>
+          <button class="btn btn-outline-primary btn-sm" onclick="openForm('employees','${esc(empId)}')"><i class="bi bi-pencil"></i> Edit Employee</button>
+          <button class="btn btn-outline-secondary btn-sm" onclick="window.print()"><i class="bi bi-printer"></i> Print</button>
+        </div>
+      </div>
+      <div class="row g-3">
+        <div class="col-md-3 text-center">${e.photoURL?`<img src="${esc(e.photoURL)}" class="photo-lg">`:`<div class="photo-lg" style="background:var(--brand);color:#fff;display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:700">${esc((e.name||'').slice(0,2).toUpperCase())}</div>`}</div>
+        <div class="col-md-9">
+          <dl class="row mb-0">
+            <dt class="col-sm-4">Father Name</dt><dd class="col-sm-8">${esc(e.fatherName||'-')}</dd>
+            <dt class="col-sm-4">Gender / Category</dt><dd class="col-sm-8">${esc(e.gender||'-')} · ${esc(e.category||'-')}</dd>
+            <dt class="col-sm-4">Special Category</dt><dd class="col-sm-8">${esc(e.specialCategory||'None')}</dd>
+            <dt class="col-sm-4">Health Status</dt><dd class="col-sm-8">${esc(e.healthStatus||'Normal')}</dd>
+            <dt class="col-sm-4">DOB / Retirement</dt><dd class="col-sm-8">${fmt(e.dob)} · ${fmt(ret)}</dd>
+            <dt class="col-sm-4">Date of Joining</dt><dd class="col-sm-8">${fmt(e.dateOfJoining)}</dd>
+            <dt class="col-sm-4">Home / Current District</dt><dd class="col-sm-8">${esc(e.homeDistrict||'-')} · ${esc(e.currentDistrict||'-')}</dd>
+            <dt class="col-sm-4">Mobile</dt><dd class="col-sm-8">${esc(e.mobile||'-')}</dd>
+            <dt class="col-sm-4">Seniority</dt><dd class="col-sm-8">${esc(e.seniority||'-')}</dd>
+            <dt class="col-sm-4">Status</dt><dd class="col-sm-8"><span class="badge-pill b-${(e.status||'').toLowerCase().replace(/\s/g,'')}">${esc(e.status||'')}</span></dd>
+            <dt class="col-sm-4">Remarks</dt><dd class="col-sm-8">${esc(e.remarks||'-')}</dd>
+          </dl>
+        </div>
+      </div>
+      <hr>
+      <h6 class="mt-3">Current Posting · वर्तमान पदस्थापन</h6>
+      ${cp? `<dl class="row mb-0">
+        <dt class="col-sm-3">Office</dt><dd class="col-sm-9">${esc(cpOff?.name||'-')}</dd>
+        <dt class="col-sm-3">Department</dt><dd class="col-sm-9">${esc(cpDept?.name||'-')}</dd>
+        <dt class="col-sm-3">District / Division</dt><dd class="col-sm-9">${esc(cp.district||'-')} · ${esc(cp.division||'-')}</dd>
+        <dt class="col-sm-3">Order No. / Date</dt><dd class="col-sm-9">${esc(cp.orderNumber||'-')} · ${fmt(cp.postingDate)}</dd>
+        <dt class="col-sm-3">Joining Dates</dt><dd class="col-sm-9">Office: ${fmt(cp.joiningDate)} · District: ${fmt(cp.districtJoiningDate)} · Division: ${fmt(cp.divisionJoiningDate)} · Cadre: ${fmt(cp.cadreJoiningDate)}</dd>
+        <dt class="col-sm-3">Durations (cut-off ${fmt(STATE.cutoffDate||new Date())})</dt><dd class="col-sm-9">Office: ${durStr(cp.joiningDate, STATE.cutoffDate?new Date(STATE.cutoffDate):new Date())} · District: ${durStr(cp.districtJoiningDate||cp.joiningDate, STATE.cutoffDate?new Date(STATE.cutoffDate):new Date())} · Division: ${durStr(cp.divisionJoiningDate||cp.joiningDate, STATE.cutoffDate?new Date(STATE.cutoffDate):new Date())}</dd>
+        <dt class="col-sm-3">Remarks</dt><dd class="col-sm-9">${esc(cp.remarks||'-')}</dd>
+      </dl>`:'<div class="text-muted small">No current posting (vacant)</div>'}
+      <hr>
+      <h6 class="mt-3">Additional Charges (${acs.length})</h6>
+      ${dt(acs,['Office','Order','Effective','Cancelled','Status'], c=>`<tr><td>${esc(offMap[c.officeId]||'-')}</td><td>${esc(c.orderNumber||'')}</td><td>${fmt(c.effectiveDate)}</td><td>${fmt(c.cancellationDate)}</td><td>${esc(c.status||'')}</td></tr>`)}
+      <h6 class="mt-3">Attachments (${ats.length})</h6>
+      ${dt(ats,['Parent Office','Attached Office','Order','Effective','End','Status'], a=>`<tr><td>${esc(offMap[a.parentOfficeId]||'-')}</td><td>${esc(offMap[a.attachedOfficeId]||'-')}</td><td>${esc(a.orderNumber||'')}</td><td>${fmt(a.effectiveDate)}</td><td>${fmt(a.endDate)}</td><td>${esc(a.status||'')}</td></tr>`)}
+      <h6 class="mt-3">Promotion Forgo (${pfs.length})</h6>
+      ${dt(pfs,['Order','Order Date','Reason'], p=>`<tr><td>${esc(p.orderNumber||'')}</td><td>${fmt(p.orderDate)}</td><td>${esc(p.reason||'')}</td></tr>`)}
+      <h6 class="mt-3">Retirement (${rets.length})</h6>
+      ${dt(rets,['Type','Retirement Date','Order','Order Date'], r=>`<tr><td>${esc(r.type||'')}</td><td>${fmt(r.retirementDate)}</td><td>${esc(r.orderNumber||'')}</td><td>${fmt(r.orderDate)}</td></tr>`)}
+      <h6 class="mt-3">Death (${dths.length})</h6>
+      ${dt(dths,['Death Date','Order','Order Date'], d=>`<tr><td>${fmt(d.deathDate)}</td><td>${esc(d.orderNumber||'')}</td><td>${fmt(d.orderDate)}</td></tr>`)}
+    </div>
+  `;
+  $('#emp-full-detail').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function renderOfficeSearch(){
+  $('#main-view').innerHTML = `
+    <div class="page-head"><div><h1>Karyalay Search · कार्यालय खोज</h1><div class="sub">Pick a district, then search the office by name</div></div>
+      <button class="btn btn-outline-secondary" onclick="navigate('reports')"><i class="bi bi-arrow-left"></i> Back to Reports</button>
+    </div>
+    <div class="section-card">
+      <div class="row g-3">
+        <div class="col-md-4"><label class="form-label">District</label>
+          <select id="off-dist" class="form-select" data-testid="office-search-district">
+            <option value="">— All Districts —</option>
+            ${DISTRICTS.map(d=>`<option value="${esc(d)}">${esc(d)}</option>`).join('')}
+          </select>
+        </div>
+        <div class="col-md-8"><label class="form-label">Office Name (type to search)</label>
+          <input id="off-search-input" class="form-control" placeholder="Type office name…" data-testid="office-search-input">
+        </div>
+      </div>
+      <div id="off-search-results" class="mt-3"></div>
+    </div>
+    <div id="off-full-detail"></div>
+  `;
+  const render = ()=>{
+    const dist = $('#off-dist').value;
+    const q = $('#off-search-input').value.trim().toLowerCase();
+    const out = $('#off-search-results');
+    const dnMap = Object.fromEntries((STATE.data.departments||[]).map(d=>[d.id,d.name]));
+    let list = STATE.data.offices;
+    if(dist) list = list.filter(o=>o.district===dist);
+    if(q) list = list.filter(o=>{
+      const dn = dnMap[o.departmentId]||o.department||'';
+      const hay = [o.name, dn, o.district, o.division].filter(Boolean).join(' ').toLowerCase();
+      return hay.includes(q);
+    });
+    list = list.slice(0,40);
+    if(!list.length){ out.innerHTML='<div class="text-muted small">No matches</div>'; return; }
+    out.innerHTML = `<div class="list-group">${list.map(o=>`<button class="list-group-item list-group-item-action" data-testid="office-result-${esc(o.id)}" onclick="showOfficeFullDetail('${esc(o.id)}')">
+      <div class="d-flex justify-content-between">
+        <div><b>${esc(o.name)}</b></div>
+        <div class="small text-muted">${esc(o.district||'')} · ${esc(o.division||'')}</div>
+      </div>
+      <div class="small text-muted">${esc(dnMap[o.departmentId]||o.department||'')}</div>
+    </button>`).join('')}</div>`;
+  };
+  $('#off-dist').addEventListener('change', render);
+  $('#off-search-input').addEventListener('input', render);
+}
+function showOfficeFullDetail(officeId){
+  const o = STATE.data.offices.find(x=>x.id===officeId);
+  if(!o) return;
+  computeOfficeStats();
+  const dept = (STATE.data.departments||[]).find(d=>d.id===o.departmentId);
+  const empMap = Object.fromEntries(STATE.data.employees.map(e=>[e.id,e]));
+  const posted = STATE.data.postings.filter(p=>p.officeId===officeId);
+  const acs = STATE.data.additionalCharges.filter(c=>c.officeId===officeId);
+  const atsHere = STATE.data.attachments.filter(a=>a.attachedOfficeId===officeId);
+  const atsParent = STATE.data.attachments.filter(a=>a.parentOfficeId===officeId);
+  const dt = (rows, headers, mapper) => rows.length? `<table class="table table-sm"><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.map(mapper).join('')}</tbody></table>` : '<div class="text-muted small">No records</div>';
+  $('#off-full-detail').innerHTML = `
+    <div class="section-card mt-3">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="mb-0">${esc(o.name)}</h4>
+        <div>
+          <button class="btn btn-outline-primary btn-sm" onclick="openForm('offices','${esc(officeId)}')"><i class="bi bi-pencil"></i> Edit Office</button>
+          <button class="btn btn-outline-secondary btn-sm" onclick="window.print()"><i class="bi bi-printer"></i> Print</button>
+        </div>
+      </div>
+      <dl class="row mb-0">
+        <dt class="col-sm-3">Department</dt><dd class="col-sm-9">${esc(dept?.name||o.department||'-')}</dd>
+        <dt class="col-sm-3">District / Division</dt><dd class="col-sm-9">${esc(o.district||'-')} · ${esc(o.division||'-')}</dd>
+        <dt class="col-sm-3">Sanctioned · Filled · Vacant</dt><dd class="col-sm-9"><b>${o.sanctioned||0}</b> · <b style="color:var(--ok)">${o._filled||0}</b> · <b style="color:var(--bad)">${o._vacant||0}</b></dd>
+        <dt class="col-sm-3">Additional Charges (active)</dt><dd class="col-sm-9">${o._additionalCharges||0}</dd>
+        <dt class="col-sm-3">Attachments (active)</dt><dd class="col-sm-9">${o._attachments||0}</dd>
+        <dt class="col-sm-3">Demand</dt><dd class="col-sm-9">${esc(o.demand||'-')}</dd>
+        <dt class="col-sm-3">Remarks</dt><dd class="col-sm-9">${esc(o.remarks||'-')}</dd>
+      </dl>
+      <hr>
+      <h6 class="mt-3">Posted Employees (${posted.length})</h6>
+      ${dt(posted,['EHRMS','Name','Status','Joining','Duration','Order'], p=>{const e=empMap[p.employeeId]||{}; const c=STATE.cutoffDate?new Date(STATE.cutoffDate):new Date(); return `<tr><td>${esc(e.manavSampadaId||'')}</td><td>${esc(e.name||'')}</td><td><span class="badge-pill b-${(e.status||'').toLowerCase().replace(/\s/g,'')}">${esc(e.status||'')}</span></td><td>${fmt(p.joiningDate)}</td><td>${durStr(p.joiningDate,c)}</td><td>${esc(p.orderNumber||'')}</td></tr>`;})}
+      <h6 class="mt-3">Additional Charges held in this office (${acs.length})</h6>
+      ${dt(acs,['EHRMS','Name','Order','Effective','Cancelled','Status'], c=>{const e=empMap[c.employeeId]||{};return `<tr><td>${esc(e.manavSampadaId||'')}</td><td>${esc(e.name||'')}</td><td>${esc(c.orderNumber||'')}</td><td>${fmt(c.effectiveDate)}</td><td>${fmt(c.cancellationDate)}</td><td>${esc(c.status||'')}</td></tr>`;})}
+      <h6 class="mt-3">Employees attached TO this office (${atsHere.length})</h6>
+      ${dt(atsHere,['EHRMS','Name','Parent Office','Order','Effective','Status'], a=>{const e=empMap[a.employeeId]||{}; const po=STATE.data.offices.find(x=>x.id===a.parentOfficeId); return `<tr><td>${esc(e.manavSampadaId||'')}</td><td>${esc(e.name||'')}</td><td>${esc(po?.name||'')}</td><td>${esc(a.orderNumber||'')}</td><td>${fmt(a.effectiveDate)}</td><td>${esc(a.status||'')}</td></tr>`;})}
+      <h6 class="mt-3">Employees from this office attached elsewhere (${atsParent.length})</h6>
+      ${dt(atsParent,['EHRMS','Name','Attached Office','Order','Effective','Status'], a=>{const e=empMap[a.employeeId]||{}; const ao=STATE.data.offices.find(x=>x.id===a.attachedOfficeId); return `<tr><td>${esc(e.manavSampadaId||'')}</td><td>${esc(e.name||'')}</td><td>${esc(ao?.name||'')}</td><td>${esc(a.orderNumber||'')}</td><td>${fmt(a.effectiveDate)}</td><td>${esc(a.status||'')}</td></tr>`;})}
+    </div>
+  `;
+  $('#off-full-detail').scrollIntoView({behavior:'smooth',block:'start'});
 }
 
 /* ---------- CUSTOM REPORT BUILDER ---------- */
@@ -1742,12 +2155,29 @@ function setupGlobalSearch(){
     const q = inp.value.trim().toLowerCase();
     if(!q){ out.classList.remove('show'); return; }
     const groups = [];
-    const ge = STATE.data.employees.filter(e=>String(e.name||'').toLowerCase().includes(q)||String(e.manavSampadaId||'').includes(q)||String(e.mobile||'').includes(q)).slice(0,6);
-    if(ge.length) groups.push({title:'Employees',items:ge.map(e=>({label:`${e.name} · ${e.manavSampadaId||''}`,sub:e.currentDistrict||'',action:()=>{navigate('employees');setTimeout(()=>viewRecord('employees',e.id),100);}}))});
-    const go = STATE.data.offices.filter(o=>String(o.name||'').toLowerCase().includes(q)||String(o.department||'').toLowerCase().includes(q)).slice(0,6);
-    if(go.length) groups.push({title:'Offices',items:go.map(o=>({label:o.name,sub:`${o.district||''} · ${o.department||''}`,action:()=>{navigate('offices');setTimeout(()=>viewRecord('offices',o.id),100);}}))});
+    const matchEmp = e=>{
+      const hay = [e.name, e.manavSampadaId, e.mobile, e.fatherName, e.homeDistrict, e.currentDistrict, e.category, e.specialCategory, e.healthStatus, e.status, e.seniority].filter(Boolean).join(' ').toLowerCase();
+      return hay.includes(q);
+    };
+    const ge = STATE.data.employees.filter(matchEmp).slice(0,8);
+    if(ge.length) groups.push({title:'Employees',items:ge.map(e=>({label:`${e.name} · ${e.manavSampadaId||''}`,sub:`${e.currentDistrict||''} · ${e.status||''}`,action:()=>{navigate('employees');setTimeout(()=>viewRecord('employees',e.id),120);}}))});
+    const deptMap = Object.fromEntries((STATE.data.departments||[]).map(d=>[d.id,d.name]));
+    const go = STATE.data.offices.filter(o=>{
+      const dn = deptMap[o.departmentId]||o.department||'';
+      const hay = [o.name, dn, o.district, o.division, o.remarks].filter(Boolean).join(' ').toLowerCase();
+      return hay.includes(q);
+    }).slice(0,8);
+    if(go.length) groups.push({title:'Offices',items:go.map(o=>({label:o.name,sub:`${o.district||''} · ${deptMap[o.departmentId]||o.department||''}`,action:()=>{navigate('offices');setTimeout(()=>viewRecord('offices',o.id),120);}}))});
+    const gd = (STATE.data.departments||[]).filter(d=>String(d.name||'').toLowerCase().includes(q)||String(d.shortName||'').toLowerCase().includes(q)).slice(0,5);
+    if(gd.length) groups.push({title:'Departments',items:gd.map(d=>({label:d.name,sub:d.shortName||'',action:()=>{navigate('departments');setTimeout(()=>viewRecord('departments',d.id),120);}}))});
+    const gp = STATE.data.postings.filter(p=>String(p.orderNumber||'').toLowerCase().includes(q)).slice(0,5);
+    if(gp.length){
+      const empMap = Object.fromEntries(STATE.data.employees.map(e=>[e.id,e.name]));
+      const offMap = Object.fromEntries(STATE.data.offices.map(o=>[o.id,o.name]));
+      groups.push({title:'Postings',items:gp.map(p=>({label:`Order ${p.orderNumber}`,sub:`${empMap[p.employeeId]||''} → ${offMap[p.officeId]||''}`,action:()=>{navigate('postings');setTimeout(()=>viewRecord('postings',p.id),120);}}))});
+    }
     if(!groups.length){ out.innerHTML = '<div class="empty" style="padding:20px"><i class="bi bi-search"></i><div>No matches</div></div>'; out.classList.add('show'); return; }
-    out.innerHTML = groups.map(g=>`<div class="gr-section">${g.title}</div>`+g.items.map((it,i)=>`<div class="gr-item" data-gid="${g.title}-${i}"><div>${esc(it.label)}<div style="font-size:11px;color:var(--muted)">${esc(it.sub)}</div></div><i class="bi bi-arrow-right"></i></div>`).join('')).join('');
+    out.innerHTML = groups.map(g=>`<div class="gr-section">${g.title}</div>`+g.items.map((it,i)=>`<div class="gr-item"><div>${esc(it.label)}<div style="font-size:11px;color:var(--muted)">${esc(it.sub)}</div></div><i class="bi bi-arrow-right"></i></div>`).join('')).join('');
     out.classList.add('show');
     out.querySelectorAll('.gr-item').forEach((el,i)=>{
       const allItems = groups.flatMap(g=>g.items);
@@ -1755,6 +2185,73 @@ function setupGlobalSearch(){
     });
   });
   document.addEventListener('click',(e)=>{ if(!out.contains(e.target)&&e.target!==inp) out.classList.remove('show'); });
+}
+
+/* ---------- AUTO RETIREMENT CHECK ---------- */
+async function runAutoRetirementCheck(){
+  const now = new Date();
+  const due = STATE.data.employees.filter(e=>{
+    if(!e.dob || e.status!=='Working') return false;
+    const ret = e.retirementDate ? new Date(e.retirementDate) : calcRetirement(e.dob);
+    return ret && ret <= now;
+  });
+  if(!due.length) return;
+  // Auto-mark as Retired
+  const batch = db.batch();
+  due.forEach(e=>{
+    const ret = e.retirementDate ? new Date(e.retirementDate) : calcRetirement(e.dob);
+    batch.update(db.collection('employees').doc(e.id), {status:'Retired', retirementActualDate: fmtISO(ret)});
+  });
+  try{ await batch.commit(); await audit('Auto-Retire','employees',null,null,{count:due.length}); }catch(e){console.warn(e);}
+  // On 1st of month OR if there are retired employees with still-active postings → show popup
+  const isFirst = now.getDate() === 1;
+  const lastShown = localStorage.getItem('hrms-retire-popup-month');
+  const ym = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const stillPosted = STATE.data.employees.filter(e=>(e.status==='Retired'||e.status==='Voluntary Retirement'||e.status==='Deceased'||e.status==='Terminated') && STATE.data.postings.some(p=>p.employeeId===e.id));
+  if(stillPosted.length && (isFirst || lastShown!==ym)){
+    showRetirementVacatePopup(stillPosted);
+    localStorage.setItem('hrms-retire-popup-month',ym);
+  }
+}
+
+function showRetirementVacatePopup(list){
+  const rows = list.map(e=>{
+    const p = STATE.data.postings.find(x=>x.employeeId===e.id);
+    const o = STATE.data.offices.find(x=>x.id===p?.officeId);
+    return `<tr data-empid="${esc(e.id)}" data-pid="${esc(p?.id||'')}">
+      <td>${esc(e.name)}</td>
+      <td>${esc(e.manavSampadaId||'')}</td>
+      <td><span class="badge-pill b-${(e.status||'').toLowerCase().replace(/\s/g,'')}">${esc(e.status)}</span></td>
+      <td>${esc(o?.name||'')}</td>
+      <td><button class="btn btn-sm btn-danger vacate-one" data-pid="${esc(p?.id||'')}" data-name="${esc(e.name)}">Vacate</button></td>
+    </tr>`;
+  }).join('');
+  const html = `<div class="modal fade" id="retire-popup" tabindex="-1" data-bs-backdrop="static"><div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content">
+    <div class="modal-header bg-warning"><h5 class="modal-title text-dark"><i class="bi bi-alarm"></i> Posts pending vacation — ${list.length} employee(s)</h5></div>
+    <div class="modal-body">
+      <p class="mb-3">The following employees have been auto-retired or are no longer in service but their posts have not been vacated. Vacate each post or close this dialog (it will reappear next month / on next login).</p>
+      <table class="table table-sm"><thead><tr><th>Name</th><th>EHRMS</th><th>Status</th><th>Office</th><th>Action</th></tr></thead><tbody>${rows}</tbody></table>
+    </div>
+    <div class="modal-footer"><button class="btn btn-light" data-bs-dismiss="modal">Close for now</button></div>
+  </div></div></div>`;
+  const old = document.getElementById('retire-popup'); if(old) old.remove();
+  document.body.insertAdjacentHTML('beforeend',html);
+  const el = document.getElementById('retire-popup');
+  const m = new bootstrap.Modal(el);
+  el.querySelectorAll('.vacate-one').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const pid = btn.dataset.pid;
+      if(!pid) return;
+      try{
+        await db.collection('postings').doc(pid).delete();
+        await audit('Vacate Post','postings',pid,null,{reason:'Monthly cleanup'});
+        btn.closest('tr').remove();
+        toast(`Vacated: ${btn.dataset.name}`,'ok');
+        if(!el.querySelectorAll('tbody tr').length){ m.hide(); }
+      }catch(e){ toast(e.message,'err'); }
+    });
+  });
+  m.show();
 }
 
 /* ---------- NAVIGATION ---------- */
@@ -1868,6 +2365,8 @@ auth.onAuthStateChanged(async user=>{
       navigate('dashboard');
       attachListeners();
       audit('Login','auth');
+      // Run auto-retirement check after data loads (give listeners ~2s to populate)
+      setTimeout(()=>{ runAutoRetirementCheck().catch(e=>console.warn(e)); }, 2500);
     } finally { hideLoader(); }
   } else {
     detachListeners();
@@ -1899,6 +2398,10 @@ window.toggleUser = toggleUser;
 window.saveSettings = saveSettings;
 window.exportDashboardPDF = exportDashboardPDF;
 window.navigate = navigate;
+window.setCutoffDate = setCutoffDate;
+window.showEmployeeFullDetail = showEmployeeFullDetail;
+window.showOfficeFullDetail = showOfficeFullDetail;
+window.runAutoRetirementCheck = runAutoRetirementCheck;
 </script>
 </body>
 </html>
