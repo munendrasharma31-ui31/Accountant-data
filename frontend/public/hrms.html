@@ -2138,7 +2138,8 @@ function renderUsers(){
       <td><span class="badge-pill ${u.active!==false?'b-working':'b-inactive'}">${u.active!==false?'Active':'Inactive'}</span></td>
       <td>${u.createdAt?.toDate?fmt(u.createdAt.toDate()):''}</td>
       <td class="text-nowrap">
-        <button class="btn btn-sm btn-outline-primary" onclick="openUserForm('${u.id}')" data-testid="edit-user-${u.id}"><i class="bi bi-pencil"></i></button>
+        <button class="btn btn-sm btn-outline-primary" onclick="openUserForm('${u.id}')" data-testid="edit-user-${u.id}" title="Edit"><i class="bi bi-pencil"></i></button>
+        <button class="btn btn-sm btn-outline-info" onclick="sendPasswordReset('${esc(u.email||'')}',this)" data-testid="reset-pwd-${u.id}" title="Send password reset email"><i class="bi bi-key"></i></button>
         <button class="btn btn-sm btn-outline-${u.active!==false?'warning':'success'}" onclick="toggleUser('${u.id}')" title="${u.active!==false?'Deactivate':'Activate'}"><i class="bi ${u.active!==false?'bi-pause':'bi-play'}"></i></button>
       </td></tr>`).join('')}</tbody></table></div></div>`;
   jQuery('#dt-users').DataTable({pageLength:25});
@@ -2154,13 +2155,43 @@ function openUserForm(id=null){
       <option value="editor" ${(existing.role==='editor'||existing.role==='user')?'selected':''}>Editor (add/edit, no delete, locked sanctioned)</option>
       <option value="super_admin" ${existing.role==='super_admin'?'selected':''}>Super Admin (full access)</option>
     </select></div>
-    <div class="col-md-6"><label class="form-label">${id?'Reset Password (leave blank to keep)':'Password *'}</label><input class="form-control" type="password" name="password" autocomplete="new-password" ${id?'':'required minlength="6"'}></div>
+    ${id?`
+      <div class="col-md-6"><label class="form-label">Password</label>
+        <button type="button" class="btn btn-outline-primary form-control text-start" id="send-pwd-reset-btn" data-testid="send-pwd-reset-btn"><i class="bi bi-envelope"></i> Send Password Reset Email</button>
+        <small class="text-muted d-block mt-1">User will receive an email with a link to set a new password. (Direct password change requires Firebase Admin SDK / server-side and is not possible from a static client app.)</small>
+      </div>
+    `:`
+      <div class="col-md-6"><label class="form-label">Password *</label><input class="form-control" type="password" name="password" autocomplete="new-password" required minlength="6"></div>
+    `}
     <div class="col-md-6"><label class="form-label">Phone</label><input class="form-control" name="phone" value="${esc(existing.phone||'')}"></div>
     <div class="col-md-6 d-flex align-items-end"><div class="form-check"><input class="form-check-input" type="checkbox" name="active" ${existing.active!==false?'checked':''}><label class="form-check-label">Active</label></div></div>
   </form>`;
   $('#um-footer').innerHTML = `<button class="btn btn-light" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary" id="user-save" data-testid="save-user-btn">Save</button>`;
   $('#user-save').onclick = ()=>saveUser(id);
+  if(id){
+    const btn = $('#send-pwd-reset-btn');
+    if(btn) btn.onclick = ()=>sendPasswordReset(existing.email, btn);
+  }
   bootstrap.Modal.getOrCreateInstance($('#universal-modal')).show();
+}
+async function sendPasswordReset(email, btn){
+  if(!email){ toast('No email to reset','warn'); return; }
+  const ok = await confirmDialog('Send password reset email', `Send a password reset email to ${email}?\n\nThe user will click the link in the email to set a new password.`);
+  if(!ok) return;
+  if(btn){ btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass"></i> Sending…'; }
+  try{
+    await auth.sendPasswordResetEmail(email);
+    await audit('Password Reset Email','users',null,null,{email});
+    toast(`Password reset email sent to ${email}`,'ok');
+    if(btn){ btn.innerHTML = '<i class="bi bi-check-circle"></i> Email sent'; btn.classList.remove('btn-outline-primary'); btn.classList.add('btn-outline-success'); }
+  }catch(e){
+    if(btn){ btn.disabled = false; btn.innerHTML = '<i class="bi bi-envelope"></i> Send Password Reset Email'; }
+    let msg = e.message;
+    if(e.code==='auth/user-not-found') msg = `No Firebase Auth account exists for ${email}. Recreate the user.`;
+    if(e.code==='auth/invalid-email') msg = 'Invalid email address';
+    if(e.code==='auth/too-many-requests') msg = 'Too many reset requests. Try again later.';
+    toast(msg,'err');
+  }
 }
 async function saveUser(id){
   const f = $('#user-form');
@@ -2172,7 +2203,6 @@ async function saveUser(id){
     if(id){
       const upd = {name:data.name, role:data.role, phone:data.phone||null, active:data.active};
       await db.collection('users').doc(id).update(upd);
-      if(data.password) toast('Password reset must be done via Firebase Auth console for security','warn');
       await audit('Update','users',id,null,upd);
     } else {
       // Create new auth user — uses secondary app to avoid signing out current
@@ -2513,6 +2543,7 @@ window.saveCustomReport = saveCustomReport;
 window.openUserForm = openUserForm;
 window.saveUser = saveUser;
 window.toggleUser = toggleUser;
+window.sendPasswordReset = sendPasswordReset;
 window.saveSettings = saveSettings;
 window.exportDashboardPDF = exportDashboardPDF;
 window.navigate = navigate;
