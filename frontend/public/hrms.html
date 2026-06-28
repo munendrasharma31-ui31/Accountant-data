@@ -861,9 +861,9 @@ const MODULES = {
     ],
     form:[
       {key:'employeeId',label:'Employee',type:'employee',req:true,onChange:'syncEmployeeCadreJoin'},
-      {key:'division',label:'Division',type:'select',opts:DIVISIONS,req:true,onChange:'filterDistrictsByDivision'},
-      {key:'district',label:'District',type:'select',opts:DISTRICTS,req:true,onChange:'filterOfficesByDistrict'},
-      {key:'officeId',label:'Office',type:'office',req:true},
+      {key:'division',label:'Division',type:'select',opts:DIVISIONS,onChange:'filterDistrictsByDivision'},
+      {key:'district',label:'District',type:'select',opts:DISTRICTS,onChange:'filterOfficesByDistrict'},
+      {key:'officeId',label:'Office',type:'office',req:true,onChange:'syncOfficeDistrict'},
       {key:'orderNumber',label:'Posting Order Number'},
       {key:'postingDate',label:'Posting Order Date',type:'date'},
       {key:'joiningDate',label:'Office Joining Date',hi:'कार्यालय में कार्यभार ग्रहण की तिथि',type:'date',req:true},
@@ -1199,6 +1199,16 @@ function handleFieldChange(action, srcKey){
     const cur = sel.value;
     const list = STATE.data.offices.filter(o=> !dist || o.district === dist);
     sel.innerHTML = '<option value="">— Select Office —</option>'+list.map(o=>`<option value="${esc(o.id)}" ${o.id===cur?'selected':''}>${esc(o.name)}</option>`).join('');
+  }
+  if(action==='syncOfficeDistrict'){
+    const offId = $('[name="officeId"]').value;
+    if(!offId) return;
+    const o = STATE.data.offices.find(x=>x.id===offId);
+    if(!o) return;
+    const dSel = $('[name="district"]');
+    const dvSel = $('[name="division"]');
+    if(dSel && !dSel.value && o.district) dSel.value = o.district;
+    if(dvSel && !dvSel.value && o.division) dvSel.value = o.division;
   }
   if(action==='autoFillParentOffice'){
     const empId = $('[name="employeeId"]').value;
