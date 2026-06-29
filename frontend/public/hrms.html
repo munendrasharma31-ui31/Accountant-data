@@ -277,7 +277,7 @@ input[type="file"]::file-selector-button{background:var(--brand);color:#fff;bord
   <main class="main" id="main-view"></main>
 </div>
 
-<div id="loader"><div class="sp"></div></div>
+<div id="loader"><div class="sp"></div><div id="loader-text" style="position:absolute;top:60%;color:#fff;font-size:14px;text-align:center;width:100%;text-shadow:0 1px 3px rgba(0,0,0,.5)"></div><button id="loader-cancel" type="button" onclick="cancelBulkImport()" style="position:absolute;top:70%;left:50%;transform:translateX(-50%);display:none;padding:8px 18px;border-radius:8px;border:1px solid rgba(255,255,255,.4);background:rgba(0,0,0,.4);color:#fff;cursor:pointer;font-size:13px" data-testid="bulk-import-cancel-btn"><i class="bi bi-x-lg"></i> Cancel import</button></div>
 <div class="toast-container" id="toast-container"></div>
 
 <!-- Universal Modal -->
@@ -443,8 +443,9 @@ const $$ = (s,p=document)=>[...p.querySelectorAll(s)];
 const fmt = (d)=>{ if(!d) return ''; const x = typeof d==='string'?new Date(d):d; if(isNaN(x))return ''; return x.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}); };
 const fmtISO = (d)=>{ if(!d) return ''; const x = typeof d==='string'?new Date(d):d; if(isNaN(x))return ''; return x.toISOString().slice(0,10); };
 const today = ()=> new Date();
-const showLoader = ()=> $('#loader').classList.add('active');
-const hideLoader = ()=> $('#loader').classList.remove('active');
+const showLoader = (text='',cancelable=false)=>{ $('#loader').classList.add('active'); const t=$('#loader-text'); if(t) t.textContent=text; const c=$('#loader-cancel'); if(c) c.style.display=cancelable?'inline-block':'none'; };
+const hideLoader = ()=> { $('#loader').classList.remove('active'); const t=$('#loader-text'); if(t) t.textContent=''; const c=$('#loader-cancel'); if(c) c.style.display='none'; };
+const setLoaderText = (text)=>{ const t=$('#loader-text'); if(t) t.textContent=text; };
 
 // Role helpers — super_admin > editor > viewer
 const isAdmin = ()=> STATE.role === 'super_admin';
@@ -624,6 +625,7 @@ function attachListeners(){
 function detachListeners(){ STATE.unsub.forEach(u=>{try{u();}catch(e){}}); STATE.unsub=[]; }
 
 function onDataChange(key){
+  if(STATE.bulkImportInProgress) return; // skip re-render during bulk import to avoid freezing browser
   if(STATE.active==='dashboard') renderDashboard();
   if(STATE.active===key) renderCurrentPage();
   if(['employees','postings','offices','deceased','retirements','additionalCharges'].includes(key) && STATE.active==='dashboard') renderDashboard();
@@ -1619,30 +1621,42 @@ function downloadTemplate(modKey){
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Template');
   XLSX.writeFile(wb, `${modKey}-template.xlsx`);
 }
+// Yield to UI thread so the browser can paint progress + remain responsive
+const yieldToUI = ()=> new Promise(r=>setTimeout(r,0));
+// Race a promise against a timeout — used to detect hung Firestore batch commits
+function withTimeout(promise, ms, label='operation'){
+  return Promise.race([
+    promise,
+    new Promise((_,rej)=>setTimeout(()=>rej(new Error(`${label} timed out after ${ms/1000}s`)), ms))
+  ]);
+}
+
 async function doBulkImport(modKey){
   const file = $('#bulk-file').files[0];
   if(!file){ toast('Choose a file','warn'); return; }
-  showLoader();
+  STATE.bulkImportCancelled = false;
+  STATE.bulkImportInProgress = true;
+  showLoader('Reading file…', true);
   try{
     const ab = await file.arrayBuffer();
     const wb = XLSX.read(ab); const ws = wb.Sheets[wb.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json(ws,{defval:null});
     const mod = MODULES[modKey];
-    let ok=0, fail=0;
     const empByMid = Object.fromEntries(STATE.data.employees.map(e=>[String(e.manavSampadaId||'').trim(),e.id]));
     const offByName = Object.fromEntries(STATE.data.offices.map(o=>[String(o.name||'').trim(),o.id]));
-    for(const r of rows){
+    // 1) Transform rows → docs in memory (fast, all sync)
+    setLoaderText(`Preparing ${rows.length} rows…`);
+    await yieldToUI();
+    const docs = [];
+    const skipped = [];
+    rows.forEach((r,idx)=>{
       try{
         const data = {};
         for(const f of mod.form){
           let v = r[f.key];
           if(v==null||v==='') continue;
-          if(f.type==='employee'){
-            v = empByMid[String(v).trim()] || v;
-          }
-          if(f.type==='office'){
-            v = offByName[String(v).trim()] || v;
-          }
+          if(f.type==='employee'){ v = empByMid[String(v).trim()] || v; }
+          if(f.type==='office'){ v = offByName[String(v).trim()] || v; }
           if(f.type==='date' && typeof v==='number'){ v = fmtISO(new Date(Math.round((v-25569)*86400*1000))); }
           if(f.type==='number') v = Number(v);
           if(f.type==='checkbox') v = String(v).toLowerCase()==='true'||v===1;
@@ -1650,15 +1664,77 @@ async function doBulkImport(modKey){
         }
         if(modKey==='employees' && data.dob && !data.retirementDate){ const rd = calcRetirement(data.dob); if(rd) data.retirementDate = fmtISO(rd); }
         data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-        await db.collection(mod.collection).add(data);
-        ok++;
-      }catch(e){ console.warn(e); fail++; }
+        docs.push(data);
+      }catch(e){ skipped.push({row:idx+2, err:e.message}); }
+    });
+    // 2) Write in batches of 400 (Firestore max is 500 ops/batch — keep safety margin)
+    const BATCH_SIZE = 400;
+    const BATCH_TIMEOUT_MS = 20000; // 20s per batch — abort if Firestore hangs
+    let written = 0;
+    let failedBatches = 0;
+    let consecutiveFails = 0;
+    for(let i=0; i<docs.length; i+=BATCH_SIZE){
+      if(STATE.bulkImportCancelled){ break; }
+      if(consecutiveFails >= 3){
+        toast('Too many consecutive failures (quota/network). Aborting.','err');
+        break;
+      }
+      const slice = docs.slice(i, i+BATCH_SIZE);
+      const batch = db.batch();
+      slice.forEach(d=>{ const ref = db.collection(mod.collection).doc(); batch.set(ref, d); });
+      setLoaderText(`Writing ${i+1}–${Math.min(i+slice.length,docs.length)} of ${docs.length}… (batch ${Math.floor(i/BATCH_SIZE)+1}/${Math.ceil(docs.length/BATCH_SIZE)}) · ${written} saved`);
+      await yieldToUI();
+      try{
+        await withTimeout(batch.commit(), BATCH_TIMEOUT_MS, 'batch.commit');
+        written += slice.length;
+        consecutiveFails = 0;
+      }catch(e){
+        console.error('Batch failed', i, e);
+        failedBatches++;
+        consecutiveFails++;
+        // Fallback: try each doc individually with shorter timeout so a single bad row doesn't sink the batch
+        setLoaderText(`Batch failed (${e.message.slice(0,40)}…) — retrying individually`);
+        await yieldToUI();
+        for(let j=0;j<slice.length;j++){
+          if(STATE.bulkImportCancelled) break;
+          try{
+            await withTimeout(db.collection(mod.collection).add(slice[j]), 8000, 'doc.add');
+            written++; consecutiveFails = 0;
+          }catch(e2){
+            skipped.push({row:'?', err:e2.message});
+          }
+          if(j%50===0){ setLoaderText(`Individual retry ${j+1}/${slice.length} of failed batch · ${written} saved total`); await yieldToUI(); }
+        }
+      }
+      await yieldToUI();
     }
-    await audit('Import', modKey, null, null, {ok,fail,total:rows.length});
-    toast(`Imported ${ok} / ${rows.length} (${fail} failed)`, fail?'warn':'ok');
+    await audit('Import', modKey, null, null, {ok:written, fail:skipped.length, total:rows.length, failedBatches});
+    const cancelled = STATE.bulkImportCancelled;
+    const aborted = consecutiveFails>=3;
+    let msg = `Imported ${written} / ${rows.length}`;
+    if(skipped.length) msg += ` · ${skipped.length} skipped`;
+    if(cancelled) msg = 'Cancelled — '+msg;
+    else if(aborted) msg = 'Aborted (network/quota) — '+msg;
+    toast(msg, (skipped.length||aborted||cancelled)?'warn':'ok');
+    if(skipped.length){
+      console.warn('Skipped rows (first 20):', skipped.slice(0,20));
+    }
     bootstrap.Modal.getInstance($('#universal-modal')).hide();
-  }catch(e){ toast('Import failed: '+e.message,'err'); }
-  finally{ hideLoader(); }
+  }catch(e){
+    console.error(e);
+    toast('Import failed: '+e.message,'err');
+  }
+  finally{
+    STATE.bulkImportInProgress = false;
+    STATE.bulkImportCancelled = false;
+    hideLoader();
+    // Trigger one final re-render now that listeners can re-act
+    if(STATE.active) renderCurrentPage();
+  }
+}
+function cancelBulkImport(){
+  STATE.bulkImportCancelled = true;
+  setLoaderText('Cancelling… (current batch will finish)');
 }
 
 function exportModule(modKey, fmt='xlsx'){
@@ -2535,6 +2611,7 @@ window.deleteRecord = deleteRecord;
 window.exportModule = exportModule;
 window.openBulkImport = openBulkImport;
 window.doBulkImport = doBulkImport;
+window.cancelBulkImport = cancelBulkImport;
 window.downloadTemplate = downloadTemplate;
 window.runReport = runReport;
 window.downloadCustomReport = downloadCustomReport;
