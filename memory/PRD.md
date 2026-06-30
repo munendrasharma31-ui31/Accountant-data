@@ -1,7 +1,7 @@
 # IAAD HRMS Portal — Product Requirements Document
 
 ## Architecture
-- Single static file `/app/index.html` (2,418 lines, mirrored to `/app/frontend/public/hrms.html`)
+- Single static file `/app/index.html` (~3,030 lines, mirrored to `/app/frontend/public/hrms.html`)
 - Firebase Auth + Firestore real-time + Storage; deployable to GitHub Pages
 
 ## Iteration History
@@ -42,6 +42,22 @@
 - Various jQuery / DataTables / Bootstrap collisions resolved in v1.0.1
 
 ## Outstanding / Future
-- Code split (>2,400 lines monolith → modular files) — recommended by testing agent
+- Code split (>3,000 lines monolith → modular files) — user explicitly forbids this
 - Email notifications for upcoming retirements (would need Cloud Functions)
 - Inline photo cropping
+- (Optional) Office Level filter in Custom Report Builder
+- (Optional) Add data-testid='global-search-results' for QA hooks
+
+## v1.2 — Office Level Classification (Feb 2026)
+- Office module: new optional **Office Level** dropdown field with 4 options — Directorate, Divisional, District, Block (`OFFICE_LEVELS` constant, line 412)
+- Field added to Offices table column (renders as info-subtle badge or em-dash when blank)
+- Office Search (`Karyalay Search`) reports view: new **Office Level** filter dropdown alongside District filter
+- Office full-detail card: shows Office Level row in dl block
+- Global header search includes Office Level in matching haystack + suggestion label
+- New **Office Level Report** (Predefined Reports list, key=`officeLevel`):
+  - Summary stat cards for each level + Unassigned bucket
+  - Summary table with TOTAL row (sanctioned / filled / vacant)
+  - Detailed Bootstrap accordion grouped by level, with office-wise rows + click-through to office detail
+  - Export buttons: Excel (Summary), Excel (Detailed), PDF
+- Bulk Import inherits new field automatically (form-driven import loop)
+- Testing: iteration_10.json — 10/10 features PASS
