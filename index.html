@@ -596,7 +596,9 @@ async function handleLogin(email,pwd){
 function attachListeners(){
   detachListeners();
   const subs = [
-    ['employees', 'employees', q=>q.orderBy('seniority','asc')],
+    // NOTE: no orderBy on listeners — Firestore excludes docs missing the orderBy field
+    // (e.g. bulk-imported employees without seniority). Sorting is handled client-side by DataTables.
+    ['employees', 'employees'],
     ['postings', 'postings'],
     ['offices', 'offices'],
     ['departments', 'departments'],
@@ -1603,16 +1605,117 @@ function openBulkImport(modKey){
   const mod = MODULES[modKey];
   $('#um-title').textContent = `Bulk Import — ${mod.title}`;
   const fields = mod.form.filter(f=>f.type!=='file').map(f=>f.key).join(', ');
+  const keyFn = DEDUP_KEYS[modKey];
+  const keyLabel = {employees:'Manav Sampada ID',offices:'OFCADM ID + Name + District',departments:'Department Name',postings:'Employee',additionalCharges:'Employee + Order# + Office',attachments:'Employee + Order# + Attached Office',promotionForgo:'Employee + Order#',retirements:'Employee',deceased:'Employee'}[modKey]||'(custom)';
   $('#um-body').innerHTML = `
-    <div class="alert alert-info small">Upload an Excel/CSV file. First row must contain column headers matching these field keys:<br><code>${esc(fields)}</code><br><br>
-    For Office/Employee references, you may provide either the ID or the human name/Manav Sampada ID — the system will auto-resolve.</div>
-    <input type="file" class="form-control" id="bulk-file" accept=".xlsx,.xls,.csv" data-testid="bulk-file-input">
-    <div class="mt-3"><button class="btn btn-outline-primary btn-sm" onclick="downloadTemplate('${modKey}')"><i class="bi bi-download"></i> Download Template</button></div>
-    <div id="bulk-preview" class="mt-3"></div>
+    <ul class="nav nav-tabs mb-3">
+      <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#bi-upload">Upload Excel/CSV</a></li>
+      <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#bi-dedup" data-testid="dedup-tab">Find & Remove Duplicates</a></li>
+    </ul>
+    <div class="tab-content">
+      <div class="tab-pane fade show active" id="bi-upload">
+        <div class="alert alert-info small">Upload an Excel/CSV file. First row must contain column headers matching these field keys:<br><code>${esc(fields)}</code><br><br>
+        For Office/Employee references, you may provide either the ID or the human name/Manav Sampada ID — the system will auto-resolve.
+        <br><b>Duplicate prevention</b>: rows matching an existing record by <code>${esc(keyLabel)}</code> are skipped automatically.</div>
+        <input type="file" class="form-control" id="bulk-file" accept=".xlsx,.xls,.csv" data-testid="bulk-file-input">
+        <div class="mt-3"><button class="btn btn-outline-primary btn-sm" onclick="downloadTemplate('${modKey}')"><i class="bi bi-download"></i> Download Template</button></div>
+      </div>
+      <div class="tab-pane fade" id="bi-dedup">
+        <div class="alert alert-warning small">Scans existing <b>${esc(mod.title)}</b> records and finds duplicates by <code>${esc(keyLabel)}</code>. The oldest (by creation time) is kept; newer copies are deleted.</div>
+        <button class="btn btn-outline-info" onclick="scanDuplicates('${modKey}')" data-testid="scan-dups-btn"><i class="bi bi-search"></i> Scan for Duplicates</button>
+        <div id="dup-results" class="mt-3"></div>
+      </div>
+    </div>
   `;
   $('#um-footer').innerHTML = `<button class="btn btn-light" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary" id="bulk-go" data-testid="bulk-import-go">Import</button>`;
   $('#bulk-go').onclick = ()=>doBulkImport(modKey);
   bootstrap.Modal.getOrCreateInstance($('#universal-modal')).show();
+}
+
+async function scanDuplicates(modKey){
+  const keyFn = DEDUP_KEYS[modKey];
+  if(!keyFn){ toast('No dedup key defined for this module','warn'); return; }
+  const out = $('#dup-results');
+  out.innerHTML = '<div class="text-muted small">Scanning…</div>';
+  await yieldToUI();
+  const groups = {};
+  STATE.data[modKey].forEach(r=>{
+    const k = keyFn(r);
+    if(!k || k==='' || /^\|+$/.test(k)) return;
+    (groups[k] = groups[k] || []).push(r);
+  });
+  const dups = Object.entries(groups).filter(([,arr])=>arr.length>1);
+  if(!dups.length){ out.innerHTML = '<div class="alert alert-success small mb-0">No duplicates found.</div>'; return; }
+  const totalExtra = dups.reduce((s,[,a])=>s+a.length-1,0);
+  // Sort each group by createdAt (oldest first)
+  const tsOf = r => (r.createdAt?.toMillis ? r.createdAt.toMillis() : (r.createdAt ? new Date(r.createdAt).getTime() : 0));
+  dups.forEach(([,arr])=>arr.sort((a,b)=>tsOf(a)-tsOf(b)));
+  out.innerHTML = `
+    <div class="alert alert-warning small mb-2"><b>${dups.length}</b> duplicate group(s) found · <b>${totalExtra}</b> extra records can be removed (oldest is kept).</div>
+    <div class="table-responsive" style="max-height:300px;overflow-y:auto">
+      <table class="table table-sm">
+        <thead><tr><th>Key</th><th>Records</th><th>Keep (oldest)</th><th>Will delete</th></tr></thead>
+        <tbody>
+          ${dups.slice(0,50).map(([k,arr])=>`<tr>
+            <td style="font-size:11px;font-family:monospace">${esc(k.slice(0,40))}</td>
+            <td>${arr.length}</td>
+            <td style="font-size:11px;color:var(--ok)">${esc(arr[0].id?.slice(0,12)||'')}</td>
+            <td style="font-size:11px;color:var(--bad)">${arr.slice(1).map(r=>esc(r.id?.slice(0,8)||'')).join(', ')}</td>
+          </tr>`).join('')}
+          ${dups.length>50?`<tr><td colspan="4" class="text-muted small">… and ${dups.length-50} more groups</td></tr>`:''}
+        </tbody>
+      </table>
+    </div>
+    <button class="btn btn-danger mt-2" onclick="removeDuplicates('${modKey}')" data-testid="remove-dups-btn"><i class="bi bi-trash"></i> Delete ${totalExtra} duplicate(s)</button>
+  `;
+}
+
+async function removeDuplicates(modKey){
+  const keyFn = DEDUP_KEYS[modKey];
+  if(!keyFn) return;
+  const ok = await confirmDialog('Remove duplicates', `This will delete all duplicate records (keeping the oldest of each group). Continue?`);
+  if(!ok) return;
+  const groups = {};
+  STATE.data[modKey].forEach(r=>{
+    const k = keyFn(r);
+    if(!k || k==='' || /^\|+$/.test(k)) return;
+    (groups[k] = groups[k] || []).push(r);
+  });
+  const tsOf = r => (r.createdAt?.toMillis ? r.createdAt.toMillis() : (r.createdAt ? new Date(r.createdAt).getTime() : 0));
+  const toDelete = [];
+  Object.values(groups).forEach(arr=>{
+    if(arr.length<2) return;
+    arr.sort((a,b)=>tsOf(a)-tsOf(b));
+    arr.slice(1).forEach(r=>toDelete.push(r.id));
+  });
+  if(!toDelete.length){ toast('Nothing to delete','warn'); return; }
+  STATE.bulkImportInProgress = true;
+  showLoader(`Deleting ${toDelete.length} duplicate(s)…`);
+  const mod = MODULES[modKey];
+  const BATCH_SIZE = 400;
+  let done = 0;
+  for(let i=0;i<toDelete.length;i+=BATCH_SIZE){
+    const slice = toDelete.slice(i,i+BATCH_SIZE);
+    const batch = db.batch();
+    slice.forEach(id=>batch.delete(db.collection(mod.collection).doc(id)));
+    setLoaderText(`Deleting ${i+1}–${Math.min(i+slice.length,toDelete.length)} of ${toDelete.length}…`);
+    await yieldToUI();
+    try{
+      await withTimeout(batch.commit(), 20000, 'delete batch');
+      done += slice.length;
+    }catch(e){
+      console.error('Delete batch failed', e);
+      for(const id of slice){
+        try{ await withTimeout(db.collection(mod.collection).doc(id).delete(), 8000, 'doc delete'); done++; }catch(e2){}
+      }
+    }
+  }
+  await audit('Remove Duplicates', modKey, null, null, {removed: done});
+  STATE.bulkImportInProgress = false;
+  hideLoader();
+  if(STATE.active) renderCurrentPage();
+  toast(`Removed ${done} duplicate(s)`, 'ok');
+  bootstrap.Modal.getInstance($('#universal-modal')).hide();
 }
 function downloadTemplate(modKey){
   const mod = MODULES[modKey];
@@ -1621,6 +1724,19 @@ function downloadTemplate(modKey){
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Template');
   XLSX.writeFile(wb, `${modKey}-template.xlsx`);
 }
+// Unique key field(s) per module — used for duplicate prevention in bulk import + cleanup tool
+const DEDUP_KEYS = {
+  employees: r => String(r.manavSampadaId||'').trim().toLowerCase(),
+  offices: r => `${String(r.ofcadmId||'').trim().toLowerCase()}|${String(r.name||'').trim().toLowerCase()}|${String(r.district||'').trim().toLowerCase()}`,
+  departments: r => String(r.name||'').trim().toLowerCase(),
+  postings: r => String(r.employeeId||'').trim(), // only-current model: one per employee
+  additionalCharges: r => `${String(r.employeeId||'')}|${String(r.orderNumber||'').trim().toLowerCase()}|${String(r.officeId||'')}`,
+  attachments: r => `${String(r.employeeId||'')}|${String(r.orderNumber||'').trim().toLowerCase()}|${String(r.attachedOfficeId||'')}`,
+  promotionForgo: r => `${String(r.employeeId||'')}|${String(r.orderNumber||'').trim().toLowerCase()}`,
+  retirements: r => String(r.employeeId||'').trim(),
+  deceased: r => String(r.employeeId||'').trim()
+};
+
 // Yield to UI thread so the browser can paint progress + remain responsive
 const yieldToUI = ()=> new Promise(r=>setTimeout(r,0));
 // Race a promise against a timeout — used to detect hung Firestore batch commits
@@ -1649,6 +1765,10 @@ async function doBulkImport(modKey){
     await yieldToUI();
     const docs = [];
     const skipped = [];
+    let dupExisting = 0, dupInFile = 0;
+    const keyFn = DEDUP_KEYS[modKey];
+    const existingKeys = keyFn ? new Set(STATE.data[modKey].map(keyFn).filter(k=>k && k!=='')) : null;
+    const fileKeys = new Set();
     rows.forEach((r,idx)=>{
       try{
         const data = {};
@@ -1663,10 +1783,23 @@ async function doBulkImport(modKey){
           data[f.key]=v;
         }
         if(modKey==='employees' && data.dob && !data.retirementDate){ const rd = calcRetirement(data.dob); if(rd) data.retirementDate = fmtISO(rd); }
+        // Dedup check
+        if(keyFn){
+          const k = keyFn(data);
+          if(k && k !== '' && k !== '|' && !k.match(/^\|+$/)){
+            if(existingKeys && existingKeys.has(k)){ dupExisting++; return; }
+            if(fileKeys.has(k)){ dupInFile++; return; }
+            fileKeys.add(k);
+          }
+        }
         data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
         docs.push(data);
       }catch(e){ skipped.push({row:idx+2, err:e.message}); }
     });
+    if(dupExisting||dupInFile){
+      setLoaderText(`Skipping ${dupExisting} already-existing + ${dupInFile} duplicate-in-file rows…`);
+      await yieldToUI();
+    }
     // 2) Write in batches of 400 (Firestore max is 500 ops/batch — keep safety margin)
     const BATCH_SIZE = 400;
     const BATCH_TIMEOUT_MS = 20000; // 20s per batch — abort if Firestore hangs
@@ -1712,10 +1845,12 @@ async function doBulkImport(modKey){
     const cancelled = STATE.bulkImportCancelled;
     const aborted = consecutiveFails>=3;
     let msg = `Imported ${written} / ${rows.length}`;
-    if(skipped.length) msg += ` · ${skipped.length} skipped`;
+    if(dupExisting) msg += ` · ${dupExisting} already existed`;
+    if(dupInFile) msg += ` · ${dupInFile} duplicate in file`;
+    if(skipped.length) msg += ` · ${skipped.length} errors`;
     if(cancelled) msg = 'Cancelled — '+msg;
     else if(aborted) msg = 'Aborted (network/quota) — '+msg;
-    toast(msg, (skipped.length||aborted||cancelled)?'warn':'ok');
+    toast(msg, (skipped.length||aborted||cancelled||dupExisting||dupInFile)?'warn':'ok');
     if(skipped.length){
       console.warn('Skipped rows (first 20):', skipped.slice(0,20));
     }
@@ -2612,6 +2747,8 @@ window.exportModule = exportModule;
 window.openBulkImport = openBulkImport;
 window.doBulkImport = doBulkImport;
 window.cancelBulkImport = cancelBulkImport;
+window.scanDuplicates = scanDuplicates;
+window.removeDuplicates = removeDuplicates;
 window.downloadTemplate = downloadTemplate;
 window.runReport = runReport;
 window.downloadCustomReport = downloadCustomReport;
