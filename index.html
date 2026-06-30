@@ -1611,6 +1611,7 @@ function openBulkImport(modKey){
     <ul class="nav nav-tabs mb-3">
       <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#bi-upload">Upload Excel/CSV</a></li>
       <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#bi-dedup" data-testid="dedup-tab">Find & Remove Duplicates</a></li>
+      ${isAdmin()?`<li class="nav-item"><a class="nav-link text-danger" data-bs-toggle="tab" href="#bi-delete" data-testid="bulk-delete-tab">Bulk Delete</a></li>`:''}
     </ul>
     <div class="tab-content">
       <div class="tab-pane fade show active" id="bi-upload">
@@ -1625,6 +1626,37 @@ function openBulkImport(modKey){
         <button class="btn btn-outline-info" onclick="scanDuplicates('${modKey}')" data-testid="scan-dups-btn"><i class="bi bi-search"></i> Scan for Duplicates</button>
         <div id="dup-results" class="mt-3"></div>
       </div>
+      ${isAdmin()?`
+      <div class="tab-pane fade" id="bi-delete">
+        <div class="alert alert-danger small"><b>⚠ Destructive action.</b> Records deleted here cannot be recovered. Use this to remove test data in bulk.</div>
+        <div class="row g-2">
+          <div class="col-md-4">
+            <label class="form-label small">Field</label>
+            <select id="bd-field" class="form-select form-select-sm">
+              ${mod.form.filter(f=>['text','tel','number','select','employee','office','department'].includes(f.type||'text')||!f.type).map(f=>`<option value="${esc(f.key)}">${esc(f.label)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label small">Match</label>
+            <select id="bd-op" class="form-select form-select-sm">
+              <option value="starts">starts with</option>
+              <option value="contains">contains</option>
+              <option value="equals">equals</option>
+              <option value="empty">is empty</option>
+            </select>
+          </div>
+          <div class="col-md-5">
+            <label class="form-label small">Value</label>
+            <input id="bd-value" class="form-control form-control-sm" placeholder="e.g. TEST or BULK">
+          </div>
+        </div>
+        <div class="mt-3">
+          <button class="btn btn-outline-warning btn-sm" onclick="previewBulkDelete('${modKey}')" data-testid="preview-bulk-delete-btn"><i class="bi bi-eye"></i> Preview matches</button>
+          <button class="btn btn-outline-danger btn-sm ms-2" onclick="deleteAllInModule('${modKey}')" data-testid="delete-all-btn"><i class="bi bi-exclamation-triangle"></i> Delete ALL records in this module</button>
+        </div>
+        <div id="bd-results" class="mt-3"></div>
+      </div>
+      `:''}
     </div>
   `;
   $('#um-footer').innerHTML = `<button class="btn btn-light" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary" id="bulk-go" data-testid="bulk-import-go">Import</button>`;
@@ -1716,6 +1748,93 @@ async function removeDuplicates(modKey){
   if(STATE.active) renderCurrentPage();
   toast(`Removed ${done} duplicate(s)`, 'ok');
   bootstrap.Modal.getInstance($('#universal-modal')).hide();
+}
+
+/* ---------- BULK DELETE (test-data cleanup) ---------- */
+function matchBulkDeleteRow(row, field, op, value){
+  let v = row[field];
+  if(op==='empty') return v==null || String(v).trim()==='';
+  if(v==null) return false;
+  const sv = String(v).toLowerCase();
+  const vv = String(value||'').toLowerCase();
+  if(op==='starts') return vv!=='' && sv.startsWith(vv);
+  if(op==='contains') return vv!=='' && sv.includes(vv);
+  if(op==='equals') return sv === vv;
+  return false;
+}
+function findBulkDeleteMatches(modKey){
+  const field = $('#bd-field').value;
+  const op = $('#bd-op').value;
+  const value = $('#bd-value').value;
+  return STATE.data[modKey].filter(r=>matchBulkDeleteRow(r, field, op, value));
+}
+async function previewBulkDelete(modKey){
+  const matches = findBulkDeleteMatches(modKey);
+  const out = $('#bd-results');
+  if(!matches.length){ out.innerHTML='<div class="alert alert-warning small mb-0">No records match.</div>'; return; }
+  const mod = MODULES[modKey];
+  const labelCol = mod.columns.find(c=>!c.render && c.key!=='photoURL')?.key || mod.columns[0].key;
+  const sample = matches.slice(0,15);
+  out.innerHTML = `
+    <div class="alert alert-warning small mb-2"><b>${matches.length}</b> record(s) match. Showing first ${sample.length}.</div>
+    <div class="table-responsive" style="max-height:280px;overflow-y:auto"><table class="table table-sm">
+      <thead><tr><th>${esc(labelCol)}</th><th>ID</th><th>Created</th></tr></thead>
+      <tbody>${sample.map(r=>{
+        const ts = r.createdAt?.toDate?fmt(r.createdAt.toDate()):'';
+        return `<tr><td>${esc(r[labelCol]||'')}</td><td style="font-size:10px;font-family:monospace">${esc(r.id?.slice(0,12)||'')}</td><td style="font-size:11px;color:var(--muted)">${esc(ts)}</td></tr>`;
+      }).join('')}</tbody>
+    </table></div>
+    <button class="btn btn-danger" onclick="confirmBulkDelete('${modKey}')" data-testid="confirm-bulk-delete-btn"><i class="bi bi-trash"></i> Permanently delete ${matches.length} record(s)</button>
+  `;
+}
+async function confirmBulkDelete(modKey){
+  if(!isAdmin()){ toast('Super Admin only','err'); return; }
+  const matches = findBulkDeleteMatches(modKey);
+  if(!matches.length) return;
+  const ok = await confirmDialog(`Permanently delete ${matches.length} record(s)?`, `This cannot be undone. All ${matches.length} matching records in ${MODULES[modKey].title} will be deleted forever.`);
+  if(!ok) return;
+  await runBulkDelete(modKey, matches.map(r=>r.id), 'pattern match');
+}
+async function deleteAllInModule(modKey){
+  if(!isAdmin()){ toast('Super Admin only','err'); return; }
+  const all = STATE.data[modKey];
+  if(!all.length){ toast('Module is already empty','info'); return; }
+  const mod = MODULES[modKey];
+  const ok = await confirmDialog(`Delete ALL ${all.length} records in ${mod.title}?`, `This will DELETE EVERY record in ${mod.title}. This cannot be undone. Type-check this in your head before clicking Confirm.`);
+  if(!ok) return;
+  const ok2 = await confirmDialog('Are you absolutely sure?', `Confirming again — all ${all.length} ${mod.title.toLowerCase()} will be permanently deleted.`);
+  if(!ok2) return;
+  await runBulkDelete(modKey, all.map(r=>r.id), 'delete all');
+}
+async function runBulkDelete(modKey, ids, reason){
+  STATE.bulkImportInProgress = true;
+  showLoader(`Deleting ${ids.length} record(s)…`, false);
+  const mod = MODULES[modKey];
+  const BATCH_SIZE = 400;
+  let done = 0, failed = 0;
+  for(let i=0;i<ids.length;i+=BATCH_SIZE){
+    const slice = ids.slice(i,i+BATCH_SIZE);
+    const batch = db.batch();
+    slice.forEach(id=>batch.delete(db.collection(mod.collection).doc(id)));
+    setLoaderText(`Deleting ${i+1}–${Math.min(i+slice.length,ids.length)} of ${ids.length}…`);
+    await yieldToUI();
+    try{
+      await withTimeout(batch.commit(), 20000, 'bulk-delete batch');
+      done += slice.length;
+    }catch(e){
+      console.error('Bulk-delete batch failed', e);
+      for(const id of slice){
+        try{ await withTimeout(db.collection(mod.collection).doc(id).delete(), 8000, 'doc delete'); done++; }catch(e2){ failed++; }
+      }
+    }
+    await yieldToUI();
+  }
+  await audit('Bulk Delete', modKey, null, null, {deleted: done, failed, reason});
+  STATE.bulkImportInProgress = false;
+  hideLoader();
+  if(STATE.active) renderCurrentPage();
+  toast(`Deleted ${done} record(s)${failed?` · ${failed} failed`:''}`, failed?'warn':'ok');
+  try{ bootstrap.Modal.getInstance($('#universal-modal'))?.hide(); }catch(e){}
 }
 function downloadTemplate(modKey){
   const mod = MODULES[modKey];
@@ -2749,6 +2868,9 @@ window.doBulkImport = doBulkImport;
 window.cancelBulkImport = cancelBulkImport;
 window.scanDuplicates = scanDuplicates;
 window.removeDuplicates = removeDuplicates;
+window.previewBulkDelete = previewBulkDelete;
+window.confirmBulkDelete = confirmBulkDelete;
+window.deleteAllInModule = deleteAllInModule;
 window.downloadTemplate = downloadTemplate;
 window.runReport = runReport;
 window.downloadCustomReport = downloadCustomReport;
