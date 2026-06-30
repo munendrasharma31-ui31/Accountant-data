@@ -21,7 +21,6 @@ const Home = () => {
     };
     helloWorldApi();
     // API and axios are module-level constants; intentionally empty dep array to run once.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
