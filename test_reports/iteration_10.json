@@ -1,0 +1,43 @@
+{
+  "summary": "Iteration 10 frontend-only verification of the new 'Office Level' feature (Directorate / Divisional / District / Block) on the single-file Firebase SPA at /hrms.html. All 10 review items PASS end-to-end via Playwright while logged in as super_admin (admin@iaad.gov.in). Created 'TEST Directorate Office' with officeLevel=Directorate, confirmed table column + badge + Karyalay Search filter + detail card row + Office Level Report (summary cards + TOTAL row + accordion) + Excel Summary download + global search suggestion all work without JS errors.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "verifications_passed": [
+    "FEATURE 1 — Office form Office Level dropdown: opening Offices → Add modal shows <select name='officeLevel'> with options ['','Directorate','Divisional','District','Block'] (exactly 4 + blank for optional). Label HTML = '<label class=\"form-label\">Office Level <span class=\"devanagari\"> · कार्यालय स्तर</span></label>' — NO asterisk, NO required attribute → field is optional as specified.",
+    "FEATURE 2 — Offices table column: #dt-offices headers list = ['Office Name','OFCADM ID','Office Level','Department','District','Division','Sanctioned','Filled (auto)','Vacant (auto)','Add. Charges','Attachments','Remarks','Actions']. 'Office Level' column present at index 2. Source code line 912 confirms blank value renders '—' (em-dash) in muted span (code-verified; no existing blank-level office in fresh DB to UI-verify but render fn is correct).",
+    "FEATURE 3 — Save & badge: created office name='TEST Directorate Office', ofcadmId='TST001', sanctioned=10, officeLevel='Directorate'. After save: 'Saved successfully' toast appeared, row visible in DataTable with badge 'Directorate' (info-subtle styled). Firestore write succeeded (1 record(s) · Live updates from Firestore).",
+    "FEATURE 4 — Office Search level filter: navigated to Predefined Reports → Karyalay Search (data-testid='run-officeSearch'). #off-level select (data-testid='office-search-level') present with options ['','Directorate','Divisional','District','Block']. Selecting 'Directorate' + typing 'TEST' filtered to single result 'TEST Directorate Office · OFCADM TST001 · Directorate · आगरा · आगरा'.",
+    "FEATURE 5 — Office detail card: clicked search result → #off-full-detail dl contains 'Office Level' dt + dd with badge 'Directorate' (verified text contains 'Office Level'). Screenshot confirms 'Office Level: Directorate' row visible between OFCADM ID and Department.",
+    "FEATURE 6 — Reports list card: Predefined Reports list contains card 'Office Level Report' with description 'Offices grouped by Level (Directorate / Divisional / District / Block)' — all 4 level names mentioned. Run button has data-testid='run-officeLevel'.",
+    "FEATURE 7 — Office Level Report rendering: clicking run-officeLevel → renderOfficeLevelReport executes. Summary section has 5 stat cards (Directorate/Divisional/District/Block + Unassigned), each with data-testid='oll-count-<level>'. oll-count-directorate=1, oll-count-unassigned=0. Summary table includes TOTAL row 'TOTAL | 1 | 10 | 0 | 10'. Detailed accordion (#oll-acc) renders one accordion-item for Directorate (the only populated level) — data-testid='oll-toggle-directorate' present. Empty levels are correctly omitted from accordion.",
+    "FEATURE 8 — Excel Summary export: clicked data-testid='oll-export-summary' → browser triggered file download 'Office Level Summary-1782798879941.xlsx'. NO JS console errors during export (errors_after_export = []). SheetJS pipeline working.",
+    "FEATURE 9 — Global search bar: typing 'Directorate' into the topbar input produced a suggestion dropdown showing the OFFICES group with 'TEST Directorate Office · Directorate' (screenshot-verified). Source line 2781 confirms o.officeLevel is included in the search 'hay' string and line 2784 appends the level to the suggestion label.",
+    "FEATURE 10 — Login: admin@iaad.gov.in / Admin@12345 logs in cleanly within ~5s; sidebar + topbar render; only expected pre-auth Firestore warning is logged (cosmetic)."
+  ],
+  "critical_code_review_comments": [
+    "OFFICE_LEVELS constant (line 412) is well-isolated and consistently used in 6 places (form opts, table render, search filter, detail dl, report grouping, summary cards). Good DRY.",
+    "renderOfficeLevelReport (line 2360) — pure function; recomputes groups + summary on every call. For very large office counts (>500) this is O(n) and fine. No memoization needed at this scale.",
+    "Detailed accordion correctly skips levels with 0 offices (`if(!list.length) return ''`) — clean UX, but the TOTAL count text 'across X level(s)' uses levels.filter(groups[l].length) which excludes Unassigned-empty too (correct).",
+    "Excel/PDF export reuses downloadCustomReport helper — single code path, consistent file naming.",
+    "Minor: Office Level field label has trailing space inside the Hindi span ('Office Level  · कार्यालय स्तर' has double space). Cosmetic only.",
+    "Minor: The global-search dropdown CSS class wasn't discoverable by my selector heuristic but it visibly works in the screenshot. If future testers need a stable hook, add data-testid='global-search-results' to the suggestion container."
+  ],
+  "test_report_links": [],
+  "action_items": [
+    "No blocking issues. Feature is production-ready.",
+    "(Optional) Add data-testid='global-search-results' to the topbar search suggestion dropdown for easier future automation.",
+    "(Optional) Trim double-space inside the Office Level label span."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (frontend-only request)", "frontend": "10/10 features PASS"},
+  "test_credentials": "admin@iaad.gov.in / Admin@12345 (super_admin)",
+  "seed_data_creation": "Created one office: name='TEST Directorate Office', ofcadmId='TST001', district='आगरा' (first option), division='आगरा' (first option), department=first dept, sanctioned=10, officeLevel='Directorate'. Persisted to Firestore (will be visible to future test runs). State now: 1 office.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "OFFICE_LEVELS = ['Directorate','Divisional','District','Block'] at line 412 of /app/index.html. Key data-testids: run-officeLevel, oll-export-summary/detailed/pdf, oll-count-<level lowercased>, oll-toggle-<level lowercased>, office-search-level, office-search-input, add-offices-btn, nav-offices, nav-predefinedReports, save-record-btn. One 'TEST Directorate Office' already seeded — reuse or delete via offices Actions column if a fresh DB is needed.",
+  "rca_of_the_issue": "N/A — all 10 review items verified as working on the live deployment."
+}
